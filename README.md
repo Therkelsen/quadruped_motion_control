@@ -6,7 +6,7 @@ Specifically, model-free learning with Proximal Policy
 Optimization (PPO), model-based learning with Probabilistic
 Ensembles and Trajectory Sampling (PETS), and imitation
 learning through DeepMimic. Each is evaluated on its ability to
-generate stable, efficient, and natural motion for the simulation of [Unitree A2, the Stellar Explorer](https://www.unitree.com/A2) in PyBullet.
+generate stable, efficient, and natural motion for the simulation of [Unitree A1](https://www.unitree.com/a1) in PyBullet.
 
 
 ## Setup
@@ -23,3 +23,8 @@ Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
+
+
+## Resources:
+
+[URDF File](https://github.com/unitreerobotics/unitree_ros/tree/master/robots)
