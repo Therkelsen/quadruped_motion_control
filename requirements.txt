@@ -1,1 +1,4 @@
 PyBullet
+gymnasium
+stable-baselines3
+tensorboard
