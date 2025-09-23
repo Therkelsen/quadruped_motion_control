@@ -25,6 +25,18 @@ pip install -r requirements.txt
 ```
 
 
+## Run programme
+Open a terminal and activate tensorboard logging:
+```bash
+tensorboard --logdir ./tensorboard
+```
+
+Run the programme ppo.py for doing ppo reinforcement learning:
+
+```bash
+ppo.py
+```
+
 ## Resources:
 
 [URDF File](https://github.com/unitreerobotics/unitree_ros/tree/master/robots)
