@@ -7,30 +7,41 @@ import pybullet_data
 import numpy as np
 import time
 
+
 class MyCustomEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 30}
 
     def __init__(self, human_friendly):
         super().__init__()
 
-        self.joint_lower_limits = np.array([-1.0472, -1.5708, -2.7227,
-                                            -1.0472, -1.5708, -2.7227,
-                                            -1.0472, -0.5236, -2.7227,
-                                            -1.0472, -0.5236, -2.7227], dtype=np.float32)
-        self.joint_upper_limits = np.array([1.0472, 3.4907, -0.83776,
-                                            1.0472, 3.4907, -0.83776,
-                                            1.0472, 4.5379, -0.83776,
-                                            1.0472, 4.5379, -0.83776], dtype=np.float32)
+        self.joint_lower_limits = np.array([
+            -1.0472, -1.5708, -2.7227,
+            -1.0472, -1.5708, -2.7227,
+            -1.0472, -0.5236, -2.7227,
+            -1.0472, -0.5236, -2.7227
+        ], dtype=np.float32)
+
+        self.joint_upper_limits = np.array([
+            1.0472, 3.4907, -0.83776,
+            1.0472, 3.4907, -0.83776,
+            1.0472, 4.5379, -0.83776,
+            1.0472, 4.5379, -0.83776
+        ], dtype=np.float32)
         
-        self.effort_limits = np.array([23.7, 23.7, 45.43, 
-                                       23.7, 23.7, 45.43, 
-                                       23.7, 23.7, 45.43, 
-                                       23.7, 23.7, 45.43], dtype=np.float32)
+        self.effort_limits = np.array([
+            23.7, 23.7, 45.43,
+            23.7, 23.7, 45.43,
+            23.7, 23.7, 45.43,
+            23.7, 23.7, 45.43
+        ], dtype=np.float32)
         
         self.action_space = gym.spaces.Box(low=self.joint_lower_limits,
                                            high=self.joint_upper_limits,
                                            dtype=np.float32)
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(18,), dtype=np.float32) # Joints, xyz, velocities
+
+        # observation: orientation(3) + lin_vel(3) + ang_vel(3) + joint_pos(12) + joint_vel(12) + contact(4)
+        obs_dim = 3 + 3 + 3 + 12 + 12 + 4
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
 
         self.state = None
         self.max_steps = 1000
@@ -51,21 +62,20 @@ class MyCustomEnv(gym.Env):
         self.robot = p.loadURDF("go2_description/urdf/go2.urdf", self.startPos, startOrientation)
         self.joint_ids = [2, 3, 4, 11, 12, 13, 20, 21, 22, 29, 30, 31]
 
+        # Indices of foot links for contact detection
+        self.foot_links = [7, 16, 25, 34]
+
         self.desired_speed = 0.5  # desired forward speed in m/s 
         self.last_action = np.zeros(self.action_space.shape, dtype=np.float32)
-        self.last_steps = [[0]*3]*5
-
+        self.last_steps = [[0, 0, 0] for _ in range(5)]  # fixed: no shared references
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.steps_taken = 0
         
-        
-        # Reset all controllable joints to zero position and zero velocity
+        # Reset joints
         for joint_idx, effort in zip(self.joint_ids, self.effort_limits):
-            # Reset position and velocity
             p.resetJointState(self.robot, joint_idx, targetValue=0.0, targetVelocity=0.0)
-            # Disable motors temporarily so physics doesn't fight the reset
             p.setJointMotorControl2(
                 bodyUniqueId=self.robot,
                 jointIndex=joint_idx,
@@ -73,85 +83,67 @@ class MyCustomEnv(gym.Env):
                 force=effort
             )
 
-        # Reset base position and orientation
-        p.resetBasePositionAndOrientation(self.robot, self.startPos, p.getQuaternionFromEuler([0,0,0]))
-        p.resetBaseVelocity(self.robot, linearVelocity=[0,0,0], angularVelocity=[0,0,0])
+        # Reset base
+        p.resetBasePositionAndOrientation(self.robot, self.startPos, p.getQuaternionFromEuler([0, 0, 0]))
+        p.resetBaseVelocity(self.robot, linearVelocity=[0, 0, 0], angularVelocity=[0, 0, 0])
 
-        # Step simulation a few times to let it settle
         for _ in range(25):
             p.stepSimulation()
-            if self.human_friendly: 
-                time.sleep(1./240)
+            if self.human_friendly:
+                time.sleep(1. / 240)
 
-        # Update internal state
-        joint_states = [p.getJointState(self.robot, i)[0] for i in self.joint_ids]
-        base_pos, _ = p.getBasePositionAndOrientation(self.robot)
-        lin_vel, ang_vel = p.getBaseVelocity(self.robot)
-        
-        self.state = np.array(list(base_pos) + list(lin_vel) + joint_states, dtype=np.float32)
-
-        return self.state, {}
-
+        self.last_steps = [self.startPos.copy() for _ in range(5)]
+        self.last_action = np.zeros(self.action_space.shape, dtype=np.float32)
+        return self._get_obs(), {}
 
     def step(self, action):
         self.steps_taken += 1
 
-        # Apply actions in PyBullet
         for idx, joint_idx in enumerate(self.joint_ids):
             p.setJointMotorControl2(self.robot, joint_idx, p.POSITION_CONTROL, targetPosition=action[idx], force=30)
         p.stepSimulation()
         
-        if self.human_friendly: 
-                time.sleep(1./240)
+        if self.human_friendly:
+            time.sleep(1. / 240)
 
-        # Update state
-        joint_states = [p.getJointState(self.robot, i)[0] for i in self.joint_ids]
-        base_pos, _ = p.getBasePositionAndOrientation(self.robot)
-        lin_vel, ang_vel = p.getBaseVelocity(self.robot)
-        
-        self.state = np.array(list(base_pos) + list(lin_vel) + joint_states, dtype=np.float32)
         self.last_action = action
-        while len(self.last_steps) > 5:
-            self.last_steps.pop(0)    
+
+        base_pos, _ = p.getBasePositionAndOrientation(self.robot)
+        if len(self.last_steps) >= 5:
+            self.last_steps.pop(0)
         self.last_steps.append(list(base_pos))
 
-        # Compute reward
-        reward = self._compute_reward()
+        reward = self._compute_reward(base_pos)
         terminated = self.steps_taken >= self.max_steps
         truncated = False
 
-        return self.state, reward, terminated, truncated, {}
+        return self._get_obs(), reward, terminated, truncated, {}
 
-    def _compute_reward(self):
-        # Reward
-        coefficients = np.array([1.0])#np.array([1000.0, -10.0, -1.0, -1.0, -0.01, -1.0])
-        
-        P = np.array(self.state[:3] - self.startPos)     # displacement vector (3,)
-        V = np.linalg.norm(self.state[3:6])              # scalar speed
-        D_cur = np.mean(np.array(self.last_steps), axis=0)  # mean direction vector (3,)
+    def _compute_reward(self, base_pos):
+        dist_now = np.linalg.norm(np.array(base_pos) - np.array(self.startPos))
+        dist_prev = np.linalg.norm(np.array(self.last_steps[-2]) - np.array(self.startPos))
+        progress = dist_now - dist_prev
 
-        reward = np.array([np.linalg.norm(P),                                # encourage displacement
-                #   abs(V - self.desired_speed),                               # penalize speed error
-                #   self.last_action.dot(self.last_action),                    # energy penalty
-                #   self.compute_height_punishment(self.state[2]),             # penalize bad height
-                #   self.steps_taken,                                          # time penalty
-                #   abs(np.arccos(np.dot(P, D_cur) / ((np.linalg.norm(P) * np.linalg.norm(D_cur)) + 1e-6)))                                             # direction penalty
-        ])
-        
-        return np.dot(coefficients, reward)
-    
-    def compute_height_punishment(self, height):
-        
-        if height <= 0:
-            return 100
-        
-        h,k = (40, 0) # (height_desired, cost)
-        x,y = (0, 50) # (no_height, cost_at_no_height)
-        
-        a = (y-k)/((x-h)**2)
-        
-        return a*(height-h)**2 + k
-        
+        energy_penalty = 0.001 * np.linalg.norm(self.last_action)
+        return float(progress - energy_penalty)
+
+    def _get_obs(self):
+        base_pos, base_orient = p.getBasePositionAndOrientation(self.robot)
+        base_lin_vel, base_ang_vel = p.getBaseVelocity(self.robot)
+        joint_states = [p.getJointState(self.robot, i) for i in self.joint_ids]
+        joint_pos = np.array([s[0] for s in joint_states], dtype=np.float32)
+        joint_vel = np.array([s[1] for s in joint_states], dtype=np.float32)
+
+        # Contact detection
+        contact = np.zeros(len(self.foot_links), dtype=np.float32)
+        for i, foot_link in enumerate(self.foot_links):
+            pts = p.getContactPoints(bodyA=self.robot, linkIndexA=foot_link, bodyB=self.plane_id)
+            contact[i] = 1.0 if len(pts) > 0 else 0.0
+
+        euler = np.array(p.getEulerFromQuaternion(base_orient), dtype=np.float32)
+        obs = np.concatenate([euler, base_lin_vel, base_ang_vel, joint_pos, joint_vel, contact])
+        return obs
+
     def render(self):
         pass
 
@@ -160,15 +152,12 @@ class MyCustomEnv(gym.Env):
 
 
 if __name__ == "__main__":
-    env = MyCustomEnv(human_friendly=True)
+    env = MyCustomEnv(human_friendly=False)
 
-    # TensorBoard log directory
     log_dir = "./tensorboard/"
-    
-    # Save checkpoints every 5000 steps 
-    checkpoint_callback = CheckpointCallback(save_freq=5000, save_path='./models/', name_prefix='ppo_go2')
+    checkpoint_callback = CheckpointCallback(save_freq=50000, save_path='./models/', name_prefix='ppo_go2')
 
     model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=log_dir)
-    model.learn(total_timesteps=50000, callback=checkpoint_callback)
+    model.learn(total_timesteps=10000000, callback=checkpoint_callback)
 
     env.close()

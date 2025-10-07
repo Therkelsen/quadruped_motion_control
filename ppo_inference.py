@@ -17,7 +17,7 @@ if __name__ == "__main__":
     check_env(env, warn=True)
 
     # Load trained PPO model
-    model_path = "./models/ppo_go2_100000_steps.zip"  # <-- path to your saved model
+    model_path = "./models/ppo_go2_2250000_steps.zip"  # <-- path to your saved model
     model = PPO.load(model_path, env=env)
 
     obs, _ = env.reset()
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     done = False
     while not done:
         # Model predicts action given observation
-        action, _ = model.predict(obs, deterministic=True)
+        action, _ = model.predict(obs, deterministic=False)
 
         # Take a step in the environment
         obs, reward, terminated, truncated, info = env.step(action)
