@@ -124,18 +124,18 @@ class MyCustomEnv(gym.Env):
 
     def _compute_reward(self):
         # Reward
-        coefficients = np.array([1000.0, -10.0, -1.0, -1.0, -0.01, -1.0])
+        coefficients = np.array([1.0])#np.array([1000.0, -10.0, -1.0, -1.0, -0.01, -1.0])
         
         P = np.array(self.state[:3] - self.startPos)     # displacement vector (3,)
         V = np.linalg.norm(self.state[3:6])              # scalar speed
         D_cur = np.mean(np.array(self.last_steps), axis=0)  # mean direction vector (3,)
 
         reward = np.array([np.linalg.norm(P),                                # encourage displacement
-                  abs(V - self.desired_speed),                               # penalize speed error
-                  self.last_action.dot(self.last_action),                    # energy penalty
-                  self.compute_height_punishment(self.state[2]),             # penalize bad height
-                  self.steps_taken,                                          # time penalty
-                  abs(np.arccos(np.dot(P, D_cur) / ((np.linalg.norm(P) * np.linalg.norm(D_cur)) + 1e-6)))                                             # direction penalty
+                #   abs(V - self.desired_speed),                               # penalize speed error
+                #   self.last_action.dot(self.last_action),                    # energy penalty
+                #   self.compute_height_punishment(self.state[2]),             # penalize bad height
+                #   self.steps_taken,                                          # time penalty
+                #   abs(np.arccos(np.dot(P, D_cur) / ((np.linalg.norm(P) * np.linalg.norm(D_cur)) + 1e-6)))                                             # direction penalty
         ])
         
         return np.dot(coefficients, reward)

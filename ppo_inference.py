@@ -17,7 +17,7 @@ if __name__ == "__main__":
     check_env(env, warn=True)
 
     # Load trained PPO model
-    model_path = "./models/ppo_go2_5000_steps.zip"  # <-- path to your saved model
+    model_path = "./models/ppo_go2_100000_steps.zip"  # <-- path to your saved model
     model = PPO.load(model_path, env=env)
 
     obs, _ = env.reset()
