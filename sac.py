@@ -11,10 +11,10 @@ import time
 
 
 if __name__ == "__main__":
-    env = MyCustomEnv(human_friendly=True)
+    env = MyCustomEnv(human_friendly=False)
 
     log_dir = "./tensorboard/"
-    checkpoint_callback = CheckpointCallback(save_freq=5000, save_path='./models/', name_prefix='sac_go2')
+    checkpoint_callback = CheckpointCallback(save_freq=50000, save_path='./models/', name_prefix='sac_go2')
 
     # Use SAC instead of PPO
     model = SAC(
@@ -33,6 +33,6 @@ if __name__ == "__main__":
         ent_coef='auto'         # automatic entropy tuning
     )
 
-    model.learn(total_timesteps=50000, callback=checkpoint_callback)
+    model.learn(total_timesteps=100000000, callback=checkpoint_callback)
 
     env.close()
