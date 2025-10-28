@@ -2,7 +2,6 @@ import gymnasium as gym
 import numpy as np
 import pybullet as p
 import pybullet_data
-import time
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
