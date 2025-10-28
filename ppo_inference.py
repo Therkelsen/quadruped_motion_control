@@ -20,7 +20,7 @@ if __name__ == "__main__":
     env = DummyVecEnv([make_env])  # PPO expects a vectorized env, even if only 1
 
     # Load the trained PPO model
-    model = PPO.load("./models/ppo_go2_latest.zip", env=env)
+    model = PPO.load("./models/ppo_go2_1800000_steps.zip", env=env)
     print("✅ Loaded trained model successfully.")
 
     obs = env.reset()

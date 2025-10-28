@@ -187,7 +187,7 @@ if __name__ == "__main__":
     env = DummyVecEnv([make_env])
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=10_000,
+        save_freq=100_000,
         save_path="./models/",
         name_prefix="ppo_go2"
     )
