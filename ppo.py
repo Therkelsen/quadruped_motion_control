@@ -193,7 +193,7 @@ if __name__ == "__main__":
     )
 
     model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./tensorboard/")
-    total_timesteps = 1_000_000
+    total_timesteps = 1_000_000_000
 
     model.learn(total_timesteps=total_timesteps, callback=checkpoint_callback)
     model.save("./models/ppo_go2_latest")
