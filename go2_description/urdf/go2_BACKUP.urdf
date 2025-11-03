@@ -160,11 +160,6 @@
     <limit lower="-2.7227" upper="-0.83776" effort="45.43" velocity="15.70" />
   </joint>
   <link name="FL_calflower">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.001"/>
-      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-    </inertial>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
@@ -179,11 +174,6 @@
     <axis xyz="0 0 0" />
   </joint>
   <link name="FL_calflower1">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.001"/>
-      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-    </inertial>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
@@ -337,11 +327,6 @@
     <limit lower="-2.7227" upper="-0.83776" effort="45.43" velocity="15.70" />
   </joint>
   <link name="FR_calflower">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.001"/>
-      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-    </inertial>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
@@ -356,11 +341,6 @@
     <axis xyz="0 0 0" />
   </joint>
   <link name="FR_calflower1">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.001"/>
-      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-    </inertial>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
@@ -514,11 +494,6 @@
     <limit lower="-2.7227" upper="-0.83776" effort="45.43" velocity="15.70" />
   </joint>
   <link name="RL_calflower">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.001"/>
-      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-    </inertial>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
@@ -533,11 +508,6 @@
     <axis xyz="0 0 0" />
   </joint>
   <link name="RL_calflower1">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.001"/>
-      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-    </inertial>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
@@ -691,11 +661,6 @@
     <limit lower="-2.7227" upper="-0.83776" effort="45.43" velocity="15.70" />
   </joint>
   <link name="RR_calflower">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.001"/>
-      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-    </inertial>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
@@ -710,11 +675,6 @@
     <axis xyz="0 0 0" />
   </joint>
   <link name="RR_calflower1">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.001"/>
-      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-    </inertial>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0" />
       <geometry>
@@ -797,10 +757,5 @@
       <child link="front_camera" />
   </joint>
   <link name="front_camera">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.001"/>
-      <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
-    </inertial>
   </link>
 </robot>

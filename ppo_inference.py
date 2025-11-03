@@ -20,7 +20,7 @@ if __name__ == "__main__":
     env = DummyVecEnv([make_env])  # PPO expects a vectorized env, even if only 1
 
     # Load the trained PPO model
-    model = PPO.load("./models/ppo_go2_1800000_steps.zip", env=env)
+    model = PPO.load("./models/ppo_go2_17000000_steps.zip", env=env)
     print("✅ Loaded trained model successfully.")
 
     obs = env.reset()
@@ -36,7 +36,7 @@ if __name__ == "__main__":
         done = np.any(done)  # VecEnv returns array, so convert to bool
 
         # Optional: print reward
-        # print(f"Reward: {reward}")
+        print(f"Reward: {reward}")
 
         # Slow down to real time for GUI visualization
         time.sleep(1.0 / 240.0)
