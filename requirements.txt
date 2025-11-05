@@ -2,3 +2,4 @@ PyBullet
 gymnasium
 stable-baselines3
 tensorboard
+genesis-world
