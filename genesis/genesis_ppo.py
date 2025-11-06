@@ -156,7 +156,9 @@ class Go2GenesisEnv(gym.Env):
         joint_pos = self.robot.get_dofs_position(self.joint_ids).cpu().numpy()
         joint_vel = self.robot.get_dofs_velocity(self.joint_ids).cpu().numpy()
         contact_vec = np.zeros(4, dtype=np.float32)
-        target_np = self.target.cpu().numpy()
+        
+        # self.target is already a NumPy array, no .cpu()
+        target_np = self.target  
         
         obs = np.concatenate([
             quat_to_rotvec(base_quat).flatten(),
@@ -172,23 +174,19 @@ class Go2GenesisEnv(gym.Env):
         return obs
 
 
-    # -------------------------
-    # Reward
-    # -------------------------
     def _compute_reward(self, action):
-        # Get robot position as numpy on CPU
-        base_pos = self.robot.get_pos().cpu().numpy()  # shape (3,)
+        base_pos = self.robot.get_pos().cpu().numpy()
+        pos_xy = base_pos[:2]
         
-        # Only x-y coordinates for target distance
-        pos_xy = base_pos[:2]  # shape (2,)
+        # self.target is already a NumPy array, no .cpu()
+        target_np = self.target  
         
-        # Ensure target and action are also on CPU as numpy
-        target_np = self.target.cpu().numpy()
-        action_np = action.cpu().numpy()
+        # action might be a NumPy array already, if not convert
+        action_np = np.array(action)
         
-        # Compute reward: negative distance to target minus small action penalty
         reward = -np.linalg.norm(pos_xy - target_np) - 0.01 * np.sum(action_np**2)
         return reward
+
 
 
 
