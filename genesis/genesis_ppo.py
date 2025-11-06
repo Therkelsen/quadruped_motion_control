@@ -220,7 +220,7 @@ if __name__ == "__main__":
     )
 
     model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./tensorboard/", device="cpu")
-    total_timesteps = 10000  # reduce for testing
+    total_timesteps = 100000  # reduce for testing
 
     model.learn(total_timesteps=total_timesteps, callback=checkpoint_callback)
     model.save("./models/ppo_go2_genesis_latest")
