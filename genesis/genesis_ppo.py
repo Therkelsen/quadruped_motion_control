@@ -149,34 +149,47 @@ class Go2GenesisEnv(gym.Env):
     # Observation
     # -------------------------
     def _get_obs(self):
-        state = self.get_robot_state()
+        base_pos = self.robot.get_pos().cpu().numpy()
+        base_quat = self.robot.get_quat().cpu().numpy()
+        base_lin_vel = self.robot.get_vel().cpu().numpy()[:3]
+        base_ang_vel = self.robot.get_ang().cpu().numpy()[:3]
+        joint_pos = self.robot.get_dofs_position(self.joint_ids).cpu().numpy()
+        joint_vel = self.robot.get_dofs_velocity(self.joint_ids).cpu().numpy()
         contact_vec = np.zeros(4, dtype=np.float32)
-
+        target_np = self.target.cpu().numpy()
+        
         obs = np.concatenate([
-            state['euler'].flatten(),
-            state['pos'].flatten(),
-            state['lin_vel'].flatten(),
-            state['ang_vel'].flatten(),
-            state['joint_pos'].flatten(),
-            state['joint_vel'].flatten(),
+            quat_to_rotvec(base_quat).flatten(),
+            base_pos.flatten(),
+            base_lin_vel.flatten(),
+            base_ang_vel.flatten(),
+            joint_pos.flatten(),
+            joint_vel.flatten(),
             contact_vec.flatten(),
-            self.target.flatten()
+            target_np.flatten()
         ]).astype(np.float32)
+        
         return obs
+
 
     # -------------------------
     # Reward
     # -------------------------
     def _compute_reward(self, action):
-        # Get robot position as a 1D numpy array
-        base_pos = np.array(self.robot.get_pos(), dtype=np.float32)  # shape (3,)
+        # Get robot position as numpy on CPU
+        base_pos = self.robot.get_pos().cpu().numpy()  # shape (3,)
         
         # Only x-y coordinates for target distance
         pos_xy = base_pos[:2]  # shape (2,)
         
+        # Ensure target and action are also on CPU as numpy
+        target_np = self.target.cpu().numpy()
+        action_np = action.cpu().numpy()
+        
         # Compute reward: negative distance to target minus small action penalty
-        reward = -np.linalg.norm(pos_xy - self.target.cpu().numpy()) - 0.01 * np.sum(action.cpu().numpy()**2)
+        reward = -np.linalg.norm(pos_xy - target_np) - 0.01 * np.sum(action_np**2)
         return reward
+
 
 
     # -------------------------
