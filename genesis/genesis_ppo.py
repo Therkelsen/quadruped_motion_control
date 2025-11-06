@@ -3,6 +3,7 @@ import torch
 import gymnasium as gym
 import numpy as np
 import genesis as gs
+import argparse
 
 from genesis.utils.geom import quat_to_rotvec
 from stable_baselines3 import PPO
@@ -201,8 +202,12 @@ class Go2GenesisEnv(gym.Env):
 # Training loop
 # ---------------------------
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Train Go2 robot in Genesis.")
+    parser.add_argument("--render", action="store_true", help="Render the environment")
+    args = parser.parse_args()
+
     def make_env():
-        env = Go2GenesisEnv(render=True)
+        env = Go2GenesisEnv(render=args.render)
         env = Monitor(env)
         return env
 
