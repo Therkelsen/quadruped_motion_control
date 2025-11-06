@@ -105,9 +105,9 @@ class Go2GenesisEnv(gym.Env):
         self.robot.set_dofs_velocity(torch.zeros(self.num_joints, device=self.device), self.joint_ids)
 
         # Standing pose
-        standing_pose = torch.tensor([0.0, 0.8, -1.5] * 4, device=self.device)
-        self.robot.set_dofs_position(standing_pose, self.joint_ids)
-        self.robot.set_dofs_velocity(torch.zeros_like(standing_pose), self.joint_ids)
+        #standing_pose = torch.tensor([0.0, 0.8, -1.5] * 4, device=self.device)
+        #self.robot.set_dofs_position(standing_pose, self.joint_ids)
+        #self.robot.set_dofs_velocity(torch.zeros_like(standing_pose), self.joint_ids)
 
         # Step simulation to settle contacts
         for _ in range(60):
@@ -179,9 +179,6 @@ class Go2GenesisEnv(gym.Env):
 
         obs = torch.cat(obs_list)
         return obs.cpu().numpy().astype(np.float32)
-
-
-
 
 
     # ==========================================================
