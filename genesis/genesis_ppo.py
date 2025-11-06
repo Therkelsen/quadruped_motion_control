@@ -3,7 +3,6 @@ import torch
 import gymnasium as gym
 import numpy as np
 import genesis as gs
-import argparse
 
 from genesis.utils.geom import quat_to_rotvec
 from stable_baselines3 import PPO
@@ -118,7 +117,7 @@ class Go2GenesisEnv(gym.Env):
         self.target = np.random.uniform(-5.0, 5.0, size=2)
 
         # Step simulation to settle
-        for _ in range(20):
+        for _ in range(60):
             self.scene.step()
 
         return self._get_obs(), {}
@@ -157,9 +156,7 @@ class Go2GenesisEnv(gym.Env):
         joint_pos = self.robot.get_dofs_position(self.joint_ids).cpu().numpy()
         joint_vel = self.robot.get_dofs_velocity(self.joint_ids).cpu().numpy()
         contact_vec = np.zeros(4, dtype=np.float32)
-        
-        # self.target is already a NumPy array, no .cpu()
-        target_np = self.target  
+        target_np = self.target.cpu().numpy()
         
         obs = np.concatenate([
             quat_to_rotvec(base_quat).flatten(),
@@ -175,19 +172,23 @@ class Go2GenesisEnv(gym.Env):
         return obs
 
 
+    # -------------------------
+    # Reward
+    # -------------------------
     def _compute_reward(self, action):
-        base_pos = self.robot.get_pos().cpu().numpy()
-        pos_xy = base_pos[:2]
+        # Get robot position as numpy on CPU
+        base_pos = self.robot.get_pos().cpu().numpy()  # shape (3,)
         
-        # self.target is already a NumPy array, no .cpu()
-        target_np = self.target  
+        # Only x-y coordinates for target distance
+        pos_xy = base_pos[:2]  # shape (2,)
         
-        # action might be a NumPy array already, if not convert
-        action_np = np.array(action)
+        # Ensure target and action are also on CPU as numpy
+        target_np = self.target.cpu().numpy()
+        action_np = action.cpu().numpy()
         
+        # Compute reward: negative distance to target minus small action penalty
         reward = -np.linalg.norm(pos_xy - target_np) - 0.01 * np.sum(action_np**2)
         return reward
-
 
 
 
@@ -202,12 +203,8 @@ class Go2GenesisEnv(gym.Env):
 # Training loop
 # ---------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train Go2 robot in Genesis.")
-    parser.add_argument("--render", action="store_true", help="Render the environment")
-    args = parser.parse_args()
-
     def make_env():
-        env = Go2GenesisEnv(render=args.render)
+        env = Go2GenesisEnv(render=True)
         env = Monitor(env)
         return env
 
@@ -220,7 +217,7 @@ if __name__ == "__main__":
     )
 
     model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./tensorboard/", device="cpu")
-    total_timesteps = 100000  # reduce for testing
+    total_timesteps = 10000  # reduce for testing
 
     model.learn(total_timesteps=total_timesteps, callback=checkpoint_callback)
     model.save("./models/ppo_go2_genesis_latest")
