@@ -117,7 +117,7 @@ class Go2GenesisEnv(gym.Env):
         self.target = np.random.uniform(-5.0, 5.0, size=2)
 
         # Step simulation to settle
-        for _ in range(60):
+        for _ in range(20):
             self.scene.step()
 
         return self._get_obs(), {}
@@ -175,19 +175,17 @@ class Go2GenesisEnv(gym.Env):
 
 
     def _compute_reward(self, action):
-        # Robot base position (CPU, NumPy)
-        base_pos = self.robot.get_pos().cpu().numpy()  # shape (1,3)
-        pos_xy = base_pos[0, :2]  # select x, y
+        base_pos = self.robot.get_pos().cpu().numpy()
+        pos_xy = base_pos[:2]
         
-        # Target is already NumPy (shape (2,))
-        target_np = self.target
+        # self.target is already a NumPy array, no .cpu()
+        target_np = self.target  
         
-        # Action as NumPy
+        # action might be a NumPy array already, if not convert
         action_np = np.array(action)
         
         reward = -np.linalg.norm(pos_xy - target_np) - 0.01 * np.sum(action_np**2)
         return reward
-
 
 
 
