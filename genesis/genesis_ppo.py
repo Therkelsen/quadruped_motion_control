@@ -37,7 +37,7 @@ class Go2GenesisEnv(gym.Env):
         # -----------------------------
         # Genesis requires CPU/NumPy for URDF init
         # -----------------------------
-        self.start_pos = np.array([0.0, 0.0, 0.5], dtype=np.float32)
+        self.start_pos = np.array([0.0, 0.0, 1.0], dtype=np.float32)
         self.start_quat = np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float32)
 
         # -----------------------------
