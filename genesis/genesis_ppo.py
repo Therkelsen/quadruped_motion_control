@@ -173,12 +173,13 @@ class Go2GenesisEnv(gym.Env):
     # Reward
     # -------------------------
     def _compute_reward(self, action):
-        base_pos = self.robot.get_pos().cpu().numpy()
-        pos_xy = base_pos[:2]
-        target_np = self.target
+        base_pos = self.robot.get_pos().cpu().numpy().flatten()  # flatten to shape (3,)
+        pos_xy = base_pos[:2]  # x,y
+        target_np = self.target  # shape (2,)
         action_np = np.array(action)
         reward = -np.linalg.norm(pos_xy - target_np) - 0.01 * np.sum(action_np**2)
         return reward
+
 
     # -------------------------
     # Close
