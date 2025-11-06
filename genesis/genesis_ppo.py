@@ -169,8 +169,10 @@ class Go2GenesisEnv(gym.Env):
     # -------------------------
     def _compute_reward(self, action):
         state = self.get_robot_state()
-        dist = np.linalg.norm(state['pos'][:2] - self.target)
-        return -dist - 0.01 * np.sum(action**2)
+        pos_xy = state['pos'][:2].flatten()   # only x,y
+        reward = -np.linalg.norm(pos_xy - self.target) - 0.01 * np.sum(action**2)
+        return reward
+
 
     # -------------------------
     # Close
