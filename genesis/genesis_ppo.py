@@ -3,13 +3,12 @@ import torch
 import gymnasium as gym
 import numpy as np
 import genesis as gs
-import argparse
-
 from genesis.utils.geom import quat_to_rotvec
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
+import argparse
 
 # ---------------------------
 # Initialize Genesis
@@ -19,7 +18,6 @@ try:
 except Exception:
     print("⚠️ GPU backend not available — falling back to CPU.")
     gs.init(backend=gs.cpu)
-
 
 # ---------------------------
 # Go2 Gym Environment
@@ -157,7 +155,7 @@ class Go2GenesisEnv(gym.Env):
         joint_pos = self.robot.get_dofs_position(self.joint_ids).cpu().numpy()
         joint_vel = self.robot.get_dofs_velocity(self.joint_ids).cpu().numpy()
         contact_vec = np.zeros(4, dtype=np.float32)
-        target_np = self.target.cpu().numpy()
+        target_np = self.target
         
         obs = np.concatenate([
             quat_to_rotvec(base_quat).flatten(),
@@ -169,29 +167,18 @@ class Go2GenesisEnv(gym.Env):
             contact_vec.flatten(),
             target_np.flatten()
         ]).astype(np.float32)
-        
         return obs
-
 
     # -------------------------
     # Reward
     # -------------------------
     def _compute_reward(self, action):
-        # Get robot position as numpy on CPU
-        base_pos = self.robot.get_pos().cpu().numpy()  # shape (3,)
-        
-        # Only x-y coordinates for target distance
-        pos_xy = base_pos[:2]  # shape (2,)
-        
-        # Ensure target and action are also on CPU as numpy
-        target_np = self.target.cpu().numpy()
-        action_np = action.cpu().numpy()
-        
-        # Compute reward: negative distance to target minus small action penalty
+        base_pos = self.robot.get_pos().cpu().numpy()
+        pos_xy = base_pos[:2]
+        target_np = self.target
+        action_np = np.array(action)
         reward = -np.linalg.norm(pos_xy - target_np) - 0.01 * np.sum(action_np**2)
         return reward
-
-
 
     # -------------------------
     # Close
@@ -222,7 +209,7 @@ if __name__ == "__main__":
     )
 
     model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./tensorboard/", device="cpu")
-    total_timesteps = 100000  # reduce for testing
+    total_timesteps = 10000  # reduce for testing
 
     model.learn(total_timesteps=total_timesteps, callback=checkpoint_callback)
     model.save("./models/ppo_go2_genesis_latest")
