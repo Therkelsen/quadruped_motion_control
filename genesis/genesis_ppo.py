@@ -116,25 +116,26 @@ class Go2GenesisEnv(gym.Env):
         return obs, float(reward), terminated, truncated, {}
 
     # -----------------------------
+    # ==========================================================
     def _compute_reward(self, action):
-        base_pos = self.robot.get_pos()[:2].astype(np.float32)
+        base_pos = self.robot.get_pos()[:2].cpu().numpy()  # <-- convert to NumPy
         dist = np.linalg.norm(base_pos - self.target)
         reward = -dist - 0.01 * np.sum(action**2)
         return reward
 
-    # -----------------------------
+# ==========================================================
     def _get_obs(self):
-        base_pos = self.robot.get_pos().astype(np.float32)
-        base_quat = self.robot.get_quat().astype(np.float32)
-
-        base_lin_vel = self.robot.get_vel()[:3].astype(np.float32)
-        base_ang_vel = self.robot.get_ang()[:3].astype(np.float32)
-
+        base_pos = self.robot.get_pos().cpu().numpy()
+        base_quat = self.robot.get_quat().cpu().numpy()
+        
+        base_lin_vel = self.robot.get_vel()[:3].cpu().numpy()
+        base_ang_vel = self.robot.get_ang()[:3].cpu().numpy()
+        
         euler = quat_to_rotvec(base_quat)
 
-        joint_pos = self.robot.get_dofs_position(self.joint_ids).astype(np.float32)
-        joint_vel = self.robot.get_dofs_velocity(self.joint_ids).astype(np.float32)
-
+        joint_pos = self.robot.get_dofs_position(self.joint_ids).cpu().numpy()
+        joint_vel = self.robot.get_dofs_velocity(self.joint_ids).cpu().numpy()
+        
         contact_vec = np.zeros(4, dtype=np.float32)
 
         obs_list = [
@@ -147,8 +148,8 @@ class Go2GenesisEnv(gym.Env):
             contact_vec.flatten(),
             self.target.flatten()
         ]
-
         return np.concatenate(obs_list).astype(np.float32)
+
 
     # -----------------------------
     def close(self):
