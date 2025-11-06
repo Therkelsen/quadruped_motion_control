@@ -1,3 +1,4 @@
+import time
 import torch
 import gymnasium as gym
 import numpy as np
@@ -10,29 +11,32 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 # ---------------------------
-# Genesis backend (GPU for simulation)
+# Initialize Genesis
 # ---------------------------
-use_gpu = gs.gpu if torch.cuda.is_available() else gs.cpu
-gs.init(backend=use_gpu)
+try:
+    gs.init(backend=gs.gpu)
+except Exception:
+    print("⚠️ GPU backend not available — falling back to CPU.")
+    gs.init(backend=gs.cpu)
 
+
+# ---------------------------
+# Go2 Gym Environment
+# ---------------------------
 class Go2GenesisEnv(gym.Env):
-    """Quadruped Go2 environment — PyTorch stays on CPU, Genesis can use GPU."""
+    """Gym environment for Go2 robot using Genesis."""
     def __init__(self, render=False):
         super().__init__()
+        self.dt = 0.02
         self.steps_taken = 0
-        self.max_steps = 10_000_000
-        self.dt = 0.02  # 50 Hz
+        self.max_steps = 1000
 
-        # Start pose
-        self.start_pos = np.array([0.0, 0.0, 1.0], dtype=np.float32)
-        self.start_quat = np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float32)
-
-        # Scene
+        # -------------------------
+        # Create Genesis scene
+        # -------------------------
         self.scene = gs.Scene(
             sim_options=gs.options.SimOptions(
-                dt=self.dt,
-                substeps=10,
-                gravity=[0, 0, -9.81]
+                dt=self.dt, substeps=10, gravity=[0, 0, -9.81]
             ),
             viewer_options=gs.options.ViewerOptions(max_FPS=int(1/self.dt)),
             vis_options=gs.options.VisOptions(show_world_frame=False),
@@ -40,20 +44,22 @@ class Go2GenesisEnv(gym.Env):
             show_viewer=render
         )
 
-        self.scene.add_entity(gs.morphs.URDF(file="../objects/plane/plane.urdf", fixed=True))
+        self.scene.add_entity(gs.morphs.URDF(file="urdf/plane/plane.urdf", fixed=True))
 
         self.robot = self.scene.add_entity(
             gs.morphs.URDF(
-                file="../objects/go2/urdf/go2.urdf",
-                pos=self.start_pos,
-                quat=self.start_quat,
-                fixed=False,
+                file="urdf/go2/urdf/go2.urdf",
+                pos=[0, 0, 0.6],
+                quat=[0, 0, 0, 1],
+                fixed=False
             )
         )
 
         self.scene.build(n_envs=1)
 
+        # -------------------------
         # Joints
+        # -------------------------
         self.joint_names = [
             "FL_hip_joint", "FL_thigh_joint", "FL_calf_joint",
             "FR_hip_joint", "FR_thigh_joint", "FR_calf_joint",
@@ -63,103 +69,120 @@ class Go2GenesisEnv(gym.Env):
         self.joint_ids = [self.robot.get_joint(name).dof_idx_local for name in self.joint_names]
         self.num_joints = len(self.joint_ids)
 
-        # Action & observation spaces
-        self.action_space = gym.spaces.Box(
-            low=-1.0, high=1.0, shape=(self.num_joints,), dtype=np.float32
-        )
-        obs_dim = 3 + 3 + 3 + 3 + (2*self.num_joints) + 4 + 2
-        self.observation_space = gym.spaces.Box(
-            low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32
-        )
+        # -------------------------
+        # Action / Observation spaces
+        # -------------------------
+        self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(self.num_joints,), dtype=np.float32)
+        obs_dim = 3 + 3 + 3 + 3 + (2 * self.num_joints) + 4 + 2
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
 
-    # -----------------------------
+        # Random target
+        self.target = np.random.uniform(-5.0, 5.0, size=2)
+
+    # -------------------------
+    # Get robot state
+    # -------------------------
+    def get_robot_state(self):
+        pos = self.robot.get_pos().cpu().numpy()
+        quat = self.robot.get_quat().cpu().numpy()
+        lin_vel = self.robot.get_vel().cpu().numpy()[:3]
+        ang_vel = self.robot.get_ang().cpu().numpy()[:3]
+        joint_pos = self.robot.get_dofs_position(self.joint_ids).cpu().numpy()
+        joint_vel = self.robot.get_dofs_velocity(self.joint_ids).cpu().numpy()
+        euler = quat_to_rotvec(quat)
+        return {
+            "pos": pos,
+            "quat": quat,
+            "lin_vel": lin_vel,
+            "ang_vel": ang_vel,
+            "joint_pos": joint_pos,
+            "joint_vel": joint_vel,
+            "euler": euler
+        }
+
+    # -------------------------
+    # Reset
+    # -------------------------
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.steps_taken = 0
 
         # Reset robot
-        self.robot.set_pos(self.start_pos)
-        self.robot.set_quat(self.start_quat)
+        self.robot.set_pos([0,0,0.6])
+        self.robot.set_quat([0,0,0,1])
         self.robot.zero_all_dofs_velocity()
+        self.robot.set_dofs_velocity(torch.zeros(self.num_joints), self.joint_ids)
+
+        # Random target
+        self.target = np.random.uniform(-5.0, 5.0, size=2)
 
         # Step simulation to settle
         for _ in range(60):
             self.scene.step()
 
-        # Random target
-        self.target = np.random.uniform(-5.0, 5.0, size=2).astype(np.float32)
-        self.last_action = np.zeros(self.num_joints, dtype=np.float32)
-
         return self._get_obs(), {}
 
-    # -----------------------------
+    # -------------------------
+    # Step
+    # -------------------------
     def step(self, action):
         self.steps_taken += 1
         action = np.clip(action, -1.0, 1.0)
 
-        # Small delta to joint positions
+        # Apply small delta
         max_delta = np.deg2rad(15.0)
-        current_positions = self.robot.get_dofs_position(self.joint_ids).astype(np.float32)
-        target_positions = np.clip(current_positions + action * max_delta, -1.0, 1.0)
+        current_pos = self.robot.get_dofs_position(self.joint_ids).cpu().numpy()
+        target_pos = np.clip(current_pos + action * max_delta, -1.0, 1.0)
+        self.robot.control_dofs_position(torch.tensor(target_pos), self.joint_ids)
 
-        self.robot.control_dofs_position(target_positions, self.joint_ids)
-
-        # Step simulation
+        # Step physics
         self.scene.step()
 
         obs = self._get_obs()
         reward = self._compute_reward(action)
         terminated = self.steps_taken >= self.max_steps
         truncated = False
-        self.last_action = action.copy()
 
         return obs, float(reward), terminated, truncated, {}
 
-    # -----------------------------
-    # ==========================================================
-    def _compute_reward(self, action):
-        base_pos = self.robot.get_pos()[:2].cpu().numpy()  # <-- convert to NumPy
-        dist = np.linalg.norm(base_pos - self.target)
-        reward = -dist - 0.01 * np.sum(action**2)
-        return reward
-
-# ==========================================================
+    # -------------------------
+    # Observation
+    # -------------------------
     def _get_obs(self):
-        base_pos = self.robot.get_pos().cpu().numpy()
-        base_quat = self.robot.get_quat().cpu().numpy()
-        
-        base_lin_vel = self.robot.get_vel()[:3].cpu().numpy()
-        base_ang_vel = self.robot.get_ang()[:3].cpu().numpy()
-        
-        euler = quat_to_rotvec(base_quat)
-
-        joint_pos = self.robot.get_dofs_position(self.joint_ids).cpu().numpy()
-        joint_vel = self.robot.get_dofs_velocity(self.joint_ids).cpu().numpy()
-        
+        state = self.get_robot_state()
         contact_vec = np.zeros(4, dtype=np.float32)
 
-        obs_list = [
-            euler.flatten(),
-            base_pos.flatten(),
-            base_lin_vel.flatten(),
-            base_ang_vel.flatten(),
-            joint_pos.flatten(),
-            joint_vel.flatten(),
+        obs = np.concatenate([
+            state['euler'].flatten(),
+            state['pos'].flatten(),
+            state['lin_vel'].flatten(),
+            state['ang_vel'].flatten(),
+            state['joint_pos'].flatten(),
+            state['joint_vel'].flatten(),
             contact_vec.flatten(),
             self.target.flatten()
-        ]
-        return np.concatenate(obs_list).astype(np.float32)
+        ]).astype(np.float32)
+        return obs
 
+    # -------------------------
+    # Reward
+    # -------------------------
+    def _compute_reward(self, action):
+        state = self.get_robot_state()
+        dist = np.linalg.norm(state['pos'][:2] - self.target)
+        return -dist - 0.01 * np.sum(action**2)
 
-    # -----------------------------
+    # -------------------------
+    # Close
+    # -------------------------
     def close(self):
         self.scene.destroy()
 
-# -----------------------------
-# Training loop
-# -----------------------------
-if __name__ == "__main__":
 
+# ---------------------------
+# Training loop
+# ---------------------------
+if __name__ == "__main__":
     def make_env():
         env = Go2GenesisEnv(render=True)
         env = Monitor(env)
@@ -174,7 +197,7 @@ if __name__ == "__main__":
     )
 
     model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./tensorboard/", device="cpu")
-    total_timesteps = 1_000_000
+    total_timesteps = 10000  # reduce for testing
 
     model.learn(total_timesteps=total_timesteps, callback=checkpoint_callback)
     model.save("./models/ppo_go2_genesis_latest")
