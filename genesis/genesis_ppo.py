@@ -153,16 +153,20 @@ class Go2GenesisEnv(gym.Env):
     def _get_obs(self):
         base_pos = torch.tensor(self.robot.get_pos(), device=self.device)
         base_quat = torch.tensor(self.robot.get_quat(), device=self.device)
-        base_lin_vel = torch.tensor(self.robot.get_vel(), device=self.device)
-        base_ang_vel = torch.tensor(self.robot.get_ang(), device=self.device)
+        
+        # Only base link velocities
+        base_lin_vel = torch.tensor(self.robot.get_vel(link_idx=0), device=self.device)
+        base_ang_vel = torch.tensor(self.robot.get_ang(link_idx=0), device=self.device)
+        
         euler = torch.tensor(quat_to_rotvec(base_quat.cpu().numpy()), device=self.device, dtype=torch.float32)
-
+        
         joint_pos = torch.tensor(self.robot.get_dofs_position(self.joint_ids), device=self.device)
         joint_vel = torch.tensor(self.robot.get_dofs_velocity(self.joint_ids), device=self.device)
         contact_vec = torch.zeros(4, device=self.device)
 
         obs = torch.cat([euler, base_pos, base_lin_vel, base_ang_vel, joint_pos, joint_vel, contact_vec, self.target])
         return obs.cpu().numpy().astype(np.float32)
+
 
     # ==========================================================
     def close(self):
