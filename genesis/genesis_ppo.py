@@ -151,28 +151,35 @@ class Go2GenesisEnv(gym.Env):
 
     # ==========================================================
     def _get_obs(self):
-    # Base position and orientation
         base_pos = torch.tensor(self.robot.get_pos(), device=self.device)
         base_quat = torch.tensor(self.robot.get_quat(), device=self.device)
-
-        # Base linear and angular velocity (slice first 3 elements)
+        
+        # Only base link linear/angular velocity
         base_lin_vel = torch.tensor(self.robot.get_vel(), device=self.device)[:3]
         base_ang_vel = torch.tensor(self.robot.get_ang(), device=self.device)[:3]
 
-        # Rotation vector from quaternion
         euler = torch.tensor(quat_to_rotvec(base_quat.cpu().numpy()), device=self.device, dtype=torch.float32)
-
-        # Joint positions/velocities
+        
         joint_pos = torch.tensor(self.robot.get_dofs_position(self.joint_ids), device=self.device)
         joint_vel = torch.tensor(self.robot.get_dofs_velocity(self.joint_ids), device=self.device)
 
-        # Contact and target
         contact_vec = torch.zeros(4, device=self.device)
 
-        # Concatenate all
-        obs = torch.cat([euler, base_pos, base_lin_vel, base_ang_vel, joint_pos, joint_vel, contact_vec, self.target])
+        # Ensure all tensors are 1D and same dtype
+        obs_list = [
+            euler.flatten(),
+            base_pos.flatten(),
+            base_lin_vel.flatten(),
+            base_ang_vel.flatten(),
+            joint_pos.flatten(),
+            joint_vel.flatten(),
+            contact_vec.flatten(),
+            torch.tensor(self.target, device=self.device, dtype=torch.float32).flatten()
+        ]
 
+        obs = torch.cat(obs_list)
         return obs.cpu().numpy().astype(np.float32)
+
 
 
 
