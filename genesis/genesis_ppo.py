@@ -168,9 +168,14 @@ class Go2GenesisEnv(gym.Env):
     # Reward
     # -------------------------
     def _compute_reward(self, action):
-        state = self.get_robot_state()
-        pos_xy = state['pos'][:2].flatten()   # only x,y
-        reward = -np.linalg.norm(pos_xy - self.target) - 0.01 * np.sum(action**2)
+        # Get robot position as a 1D numpy array
+        base_pos = np.array(self.robot.get_pos(), dtype=np.float32)  # shape (3,)
+        
+        # Only x-y coordinates for target distance
+        pos_xy = base_pos[:2]  # shape (2,)
+        
+        # Compute reward: negative distance to target minus small action penalty
+        reward = -np.linalg.norm(pos_xy - self.target.cpu().numpy()) - 0.01 * np.sum(action.cpu().numpy()**2)
         return reward
 
 
