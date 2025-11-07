@@ -1,9 +1,5 @@
-PyBullet
-gymnasium
-stable-baselines3
-tensorboard
 genesis-world
-rsl-rl-lib==2.2.4
-stable-baselines3[extra] 
-gymnasium 
 torch
+stable-baselines3
+rsl-rl-lib==2.2.4
+tensorboard

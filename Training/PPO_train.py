@@ -8,7 +8,7 @@ import genesis as gs
 from stable_baselines3 import PPO
 
 from src.Gymwrapper import GenesisVecEnv
-from Genesis.examples.locomotion.go2_train import get_cfgs, get_train_cfg  # ✅ imported from your existing Genesis RSL-RL script
+from src.Configs import get_cfgs, get_train_cfg
 
 def main():
     parser = argparse.ArgumentParser()
