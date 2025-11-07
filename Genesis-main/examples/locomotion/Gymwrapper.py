@@ -61,70 +61,58 @@ class GenesisVecEnv(VecEnv):
         if self.actions_pending is None:
             raise RuntimeError("step_wait called without step_async")
 
+        # Convert actions to tensor
         act_t = torch.tensor(self.actions_pending, dtype=torch.float32, device=self.device)
         obs_t, reward_t, done_t, infos = self.env.step(act_t)
 
-        # ensure obs is tensor and not tuple
+        # Ensure obs is tensor, unwrap if tuple
         if isinstance(obs_t, tuple):
             obs_t = obs_t[0]
-
         obs_np = obs_t.detach().cpu().numpy()
         if obs_np.ndim == 1:
             obs_np = obs_np[None, :]  # force 2D
 
+        # Rewards and dones as numpy arrays
         rewards = reward_t.detach().cpu().numpy() if isinstance(reward_t, torch.Tensor) else np.array(reward_t, dtype=np.float32)
         dones = done_t.detach().cpu().numpy().astype(bool) if isinstance(done_t, torch.Tensor) else np.array(done_t, dtype=bool)
 
-        # Convert infos dict to list of dicts (one per env).
-        # Episode info from Go2Env may be a dict of scalars, tensors, or arrays.
-        # Attach episode info only to envs that terminated (dones==True) and
-        # handle both per-env arrays and scalar values gracefully.
+        # Build per-env infos
         per_env_infos: List[Dict[str, Any]] = []
-        if isinstance(infos, dict) and "episode" in infos:
-            ep_dict = infos["episode"]
-            for i in range(self.num_envs):
-                ie: Dict[str, Any] = {}
-                # Only include episode info for envs that finished this step
+        for i in range(self.num_envs):
+            ie: Dict[str, Any] = {}
+            # Attach episode info if infos has it
+            if isinstance(infos, dict) and "episode" in infos:
+                ep_dict = infos["episode"]
                 if dones[i]:
                     ie_episode: Dict[str, Any] = {}
                     for k, v in ep_dict.items():
                         try:
-                            # torch.Tensor case
                             if isinstance(v, torch.Tensor):
-                                # If tensor contains a value per env, index it; otherwise take scalar
-                                if v.numel() == self.num_envs:
-                                    val = v[i].item()
-                                else:
-                                    val = v.item()
-                            # numpy array
+                                val = v[i].item() if v.numel() == self.num_envs else v.item()
                             elif isinstance(v, np.ndarray):
-                                if v.size == self.num_envs:
-                                    val = v[i].item()
-                                else:
-                                    # scalar numpy
-                                    val = v.item()
-                            # list/tuple
+                                val = v[i].item() if v.size == self.num_envs else v.item()
                             elif isinstance(v, (list, tuple)):
                                 val = v[i]
                             else:
-                                # scalar (float/int)
                                 val = v
                         except Exception:
-                            # Fallback: try converting to float, otherwise keep raw
                             try:
                                 val = float(v)
                             except Exception:
                                 val = v
                         ie_episode[k] = val
                     ie["episode"] = ie_episode
-                per_env_infos.append(ie)
-        else:
-            per_env_infos = [{} for _ in range(self.num_envs)]
+            # Always set 'r' for SB3 logging if done
+            if dones[i]:
+                ie["r"] = float(rewards[i])
+            per_env_infos.append(ie)
 
+        # Save state
         self._obs, self._rewards, self._dones, self._infos = obs_np, rewards, dones, per_env_infos
         self.actions_pending = None
 
         return obs_np, rewards, dones, per_env_infos
+
 
 
     def step(self, actions: np.ndarray):
