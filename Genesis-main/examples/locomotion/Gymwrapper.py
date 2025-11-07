@@ -173,6 +173,30 @@ class GenesisVecEnv(VecEnv):
     def env_is_wrapped(self, wrapper_class) -> bool:
         # Not used normally, return False
         return False
+    
+    def env_method(self, method_name, *args, indices=None, **kwargs):
+        """Call a method of the wrapped env(s)."""
+        if indices is None:
+            indices = range(self.num_envs)
+        results = []
+        for i in indices:
+            method = getattr(self.env, method_name)
+            results.append(method(*args, **kwargs))
+        return results
+
+    def get_attr(self, attr_name, indices=None):
+        """Get attribute(s) from the env(s)."""
+        if indices is None:
+            indices = range(self.num_envs)
+        return [getattr(self.env, attr_name) for i in indices]
+
+    def set_attr(self, attr_name, value, indices=None):
+        """Set attribute(s) in the env(s)."""
+        if indices is None:
+            indices = range(self.num_envs)
+        for i in indices:
+            setattr(self.env, attr_name, value)
+
 
 
 # --- small single-env wrapper for evaluation when you want show_viewer=True ---
