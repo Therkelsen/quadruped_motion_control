@@ -256,7 +256,7 @@ class Go2Env:
         return self.obs_buf, None, self.rew_buf, self.reset_buf, self.extras
 
     def get_observations(self):
-        return self.obs_buf, None
+        return self.obs_buf
 
     def get_privileged_observations(self):
         return None
