@@ -39,7 +39,7 @@ print("Model loaded. Device:", DEVICE)
 # Create env                          
 # ----------------------
 print(f"Creating Genesis environment (render={RENDER})...")
-env = Go2GenesisEnv(render=RENDER, device=DEVICE)
+env = Go2GenesisEnv(render=RENDER)
 
 def reset_env():
     """Handle gymnasium vs gym reset return."""
