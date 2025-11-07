@@ -3,3 +3,4 @@ gymnasium
 stable-baselines3
 tensorboard
 genesis-world
+rsl-rl-lib==2.2.4

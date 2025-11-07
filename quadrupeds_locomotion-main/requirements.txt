@@ -1,8 +1,0 @@
-pandas
-numpy
-matplotlib==3.8.0
-imageio
-wandb
-moviepy
-tensorboard
-pynput

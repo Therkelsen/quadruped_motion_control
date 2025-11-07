@@ -1,6 +1,0 @@
-[submodule "src/rsl_rl"]
-	path = rsl_rl
-	url = git@github.com:leggedrobotics/rsl_rl.git
-[submodule "genesis"]
-	path = genesis
-	url = git@github.com:Genesis-Embodied-AI/Genesis.git
