@@ -34,9 +34,16 @@ class GenesisVecEnv(VecEnv):
         self.actions_pending = None
         self.closed = False
 
-    def reset(self) -> Tuple[np.ndarray, Dict[str, Any]]:
+    def reset(self) -> np.ndarray:
+        """Reset the vectorized environment and return observations.
+
+        SB3 expects reset() from a VecEnv to return a plain ndarray of
+        observations (shape [num_envs, obs_dim]). Previously this returned
+        a tuple (obs, info) which made Stable-Baselines3 receive a tuple and
+        raise "Unrecognized type of observation <class 'tuple'>".
+        """
         obs, _ = self.env.reset()
-        # ensure obs is a tensor
+        # ensure obs is a tensor (Go2Env may return a tensor or a tuple-wrapped tensor)
         if isinstance(obs, tuple):
             obs = obs[0]
         obs_np = obs.detach().cpu().numpy()
@@ -44,7 +51,7 @@ class GenesisVecEnv(VecEnv):
         if obs_np.ndim == 1:
             obs_np = obs_np[None, :]
         self._obs = obs_np
-        return obs_np, {}
+        return obs_np
 
 
     def step_async(self, actions: np.ndarray) -> None:
