@@ -5,9 +5,8 @@ from stable_baselines3.common.vec_env import VecEnv
 import gymnasium as gym
 from typing import Dict, Any, List, Tuple
 
-from Genesis.examples.locomotion.go2_env import Go2Env
+from src.Go2_env import Go2Env
 import genesis as gs
-
 
 class GenesisVecEnv(VecEnv):
     def __init__(self, num_envs: int, env_cfg: dict, obs_cfg: dict, reward_cfg: dict,
