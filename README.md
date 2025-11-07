@@ -41,7 +41,7 @@ pip install -r requirements.txt
 Run the training scripts for doing reinforcement learning (default total_timesteps is 10_000_000):
 
 ```bash
-python3 -m Training.PPO_train.py --exp_name experiment_name --total_timesteps total_timesteps
+python3 -m Training.PPO_train --exp_name experiment_name --total_timesteps total_timesteps
 ```
 
 Open a terminal and activate tensorboard logging:
@@ -51,7 +51,7 @@ tensorboard --logdir logs
 
 For running inference:
 ```bash
-python3 -m Evaluation.PPO_eval.py --exp_name experiment_name --episodes num_episodes
+python3 -m Evaluation.PPO_eval --exp_name experiment_name --episodes num_episodes
 ```
 
 ## Resources:

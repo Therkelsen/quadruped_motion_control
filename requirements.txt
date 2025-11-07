@@ -2,9 +2,4 @@ genesis-world
 torch
 stable-baselines3
 rsl-rl-lib==2.2.4
-
-PyBullet
-gymnasium
 tensorboard
-stable-baselines3[extra] 
-gymnasium 
