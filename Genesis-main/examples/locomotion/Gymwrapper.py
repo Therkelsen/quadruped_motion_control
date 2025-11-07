@@ -64,7 +64,6 @@ class GenesisVecEnv(VecEnv):
         act_t = torch.tensor(self.actions_pending, dtype=torch.float32, device=self.device)
         obs_t, reward_t, done_t, infos = self.env.step(act_t)
 
-        # unwrap obs if tuple
         if isinstance(obs_t, tuple):
             obs_t = obs_t[0]
 
@@ -75,34 +74,34 @@ class GenesisVecEnv(VecEnv):
         rewards = reward_t.detach().cpu().numpy() if isinstance(reward_t, torch.Tensor) else np.array(reward_t, dtype=np.float32)
         dones = done_t.detach().cpu().numpy().astype(bool) if isinstance(done_t, torch.Tensor) else np.array(done_t, dtype=bool)
 
+        # --- track episode rewards and lengths ---
+        if not hasattr(self, "_episode_rewards"):
+            self._episode_rewards = np.zeros(self.num_envs, dtype=np.float32)
+        if not hasattr(self, "_episode_lengths"):
+            self._episode_lengths = np.zeros(self.num_envs, dtype=np.int32)
+
+        self._episode_rewards += rewards
+        self._episode_lengths += 1
+
         per_env_infos: List[Dict[str, Any]] = []
         for i in range(self.num_envs):
             ie: Dict[str, Any] = {}
             if dones[i]:
-                # SB3 expects episode info under 'episode' key
-                ep_info: Dict[str, float] = {"r": float(rewards[i])}  # total reward for this episode
-                # merge any additional episode info from infos
-                if isinstance(infos, dict) and "episode" in infos:
-                    for k, v in infos["episode"].items():
-                        try:
-                            if isinstance(v, torch.Tensor):
-                                val = v[i].item() if v.numel() == self.num_envs else v.item()
-                            elif isinstance(v, np.ndarray):
-                                val = v[i].item() if v.size == self.num_envs else v.item()
-                            elif isinstance(v, (list, tuple)):
-                                val = v[i]
-                            else:
-                                val = v
-                        except Exception:
-                            val = float(v) if hasattr(v, "__float__") else v
-                        ep_info[k] = val
-                ie["episode"] = ep_info
+                # Include episode reward and length for SB3
+                ie["episode"] = {
+                    "r": float(self._episode_rewards[i]),
+                    "l": int(self._episode_lengths[i])
+                }
+                # reset counters
+                self._episode_rewards[i] = 0.0
+                self._episode_lengths[i] = 0
             per_env_infos.append(ie)
 
         self._obs, self._rewards, self._dones, self._infos = obs_np, rewards, dones, per_env_infos
         self.actions_pending = None
 
         return obs_np, rewards, dones, per_env_infos
+
 
 
 
