@@ -8,7 +8,7 @@ import genesis as gs
 from stable_baselines3 import PPO
 
 from Gymwrapper import GenesisVecEnv  # the custom VecEnv above
-from go2_env import get_cfgs  # function to get env configs
+from go2_train import get_cfgs  # function to get env configs
 
 
 def main():
