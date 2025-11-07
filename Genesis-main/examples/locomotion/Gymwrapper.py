@@ -75,13 +75,48 @@ class GenesisVecEnv(VecEnv):
         rewards = reward_t.detach().cpu().numpy() if isinstance(reward_t, torch.Tensor) else np.array(reward_t, dtype=np.float32)
         dones = done_t.detach().cpu().numpy().astype(bool) if isinstance(done_t, torch.Tensor) else np.array(done_t, dtype=bool)
 
-        # Convert infos dict to list of dicts (one per env)
+        # Convert infos dict to list of dicts (one per env).
+        # Episode info from Go2Env may be a dict of scalars, tensors, or arrays.
+        # Attach episode info only to envs that terminated (dones==True) and
+        # handle both per-env arrays and scalar values gracefully.
         per_env_infos: List[Dict[str, Any]] = []
         if isinstance(infos, dict) and "episode" in infos:
+            ep_dict = infos["episode"]
             for i in range(self.num_envs):
-                ie = {}
-                if "episode" in infos:
-                    ie["episode"] = {k: v[i].item() for k, v in infos["episode"].items()}
+                ie: Dict[str, Any] = {}
+                # Only include episode info for envs that finished this step
+                if dones[i]:
+                    ie_episode: Dict[str, Any] = {}
+                    for k, v in ep_dict.items():
+                        try:
+                            # torch.Tensor case
+                            if isinstance(v, torch.Tensor):
+                                # If tensor contains a value per env, index it; otherwise take scalar
+                                if v.numel() == self.num_envs:
+                                    val = v[i].item()
+                                else:
+                                    val = v.item()
+                            # numpy array
+                            elif isinstance(v, np.ndarray):
+                                if v.size == self.num_envs:
+                                    val = v[i].item()
+                                else:
+                                    # scalar numpy
+                                    val = v.item()
+                            # list/tuple
+                            elif isinstance(v, (list, tuple)):
+                                val = v[i]
+                            else:
+                                # scalar (float/int)
+                                val = v
+                        except Exception:
+                            # Fallback: try converting to float, otherwise keep raw
+                            try:
+                                val = float(v)
+                            except Exception:
+                                val = v
+                        ie_episode[k] = val
+                    ie["episode"] = ie_episode
                 per_env_infos.append(ie)
         else:
             per_env_infos = [{} for _ in range(self.num_envs)]
