@@ -10,10 +10,22 @@ generate stable, efficient, and natural motion for the simulation of [Unitree A1
 
 
 ## Setup
+
+Clone repo:
+```bash
+git clone https://github.com/Therkelsen/quadruped_motion_control.git && cd quadruped_motion_control
+```
+
+Initialize submodule:
+```bash
+git submodule update --init --recursive
+```
+
 Setup virtual environment:
 ```bash
 python3 -m venv env
 ```
+
 Source it:
 ```bash
 source env/bin/activate
@@ -24,19 +36,24 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-
 ## Run programme
-Open a terminal and activate tensorboard logging:
+
+Run the training scripts for doing reinforcement learning (default total_timesteps is 10_000_000):
+
 ```bash
-tensorboard --logdir ./tensorboard
+python3 Training/PPO_train.py --exp_name experiment_name --total_timesteps total_timesteps
 ```
 
-Run the programme ppo.py for doing ppo reinforcement learning:
-
+Open a terminal and activate tensorboard logging:
 ```bash
-ppo.py
+tensorboard --logdir logs
+```
+
+For running inference:
+```bash
+python3 Evaluation/PPO_eval.py --exp_name experiment_name --episodes num_episodes
 ```
 
 ## Resources:
 
-[URDF File](https://github.com/unitreerobotics/unitree_ros/tree/master/robots)
+[Genesis Github](https://github.com/Genesis-Embodied-AI/Genesis?tab=readme-ov-file)
