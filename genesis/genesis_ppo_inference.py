@@ -13,7 +13,7 @@ import os
 import numpy as np
 import torch
 from stable_baselines3 import PPO
-from genesis.genesis_ppo import Go2GenesisEnv  # your fixed env file
+from genesis_ppo import Go2GenesisEnv  # your fixed env file
 
 # ----------------------
 # Configuration
@@ -36,7 +36,7 @@ model = PPO.load(MODEL_PATH, device=DEVICE)
 print("Model loaded. Device:", DEVICE)
 
 # ----------------------
-# Create env
+# Create env                          
 # ----------------------
 print(f"Creating Genesis environment (render={RENDER})...")
 env = Go2GenesisEnv(render=RENDER, device=DEVICE)
