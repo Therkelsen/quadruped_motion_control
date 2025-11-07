@@ -36,9 +36,16 @@ class GenesisVecEnv(VecEnv):
 
     def reset(self) -> Tuple[np.ndarray, Dict[str, Any]]:
         obs, _ = self.env.reset()
+        # ensure obs is a tensor
+        if isinstance(obs, tuple):
+            obs = obs[0]
         obs_np = obs.detach().cpu().numpy()
+        # force 2D shape [num_envs, obs_dim]
+        if obs_np.ndim == 1:
+            obs_np = obs_np[None, :]
         self._obs = obs_np
         return obs_np, {}
+
 
     def step_async(self, actions: np.ndarray) -> None:
         self.actions_pending = actions
@@ -50,7 +57,14 @@ class GenesisVecEnv(VecEnv):
         act_t = torch.tensor(self.actions_pending, dtype=torch.float32, device=self.device)
         obs_t, reward_t, done_t, infos = self.env.step(act_t)
 
+        # ensure obs is tensor and not tuple
+        if isinstance(obs_t, tuple):
+            obs_t = obs_t[0]
+
         obs_np = obs_t.detach().cpu().numpy()
+        if obs_np.ndim == 1:
+            obs_np = obs_np[None, :]  # force 2D
+
         rewards = reward_t.detach().cpu().numpy() if isinstance(reward_t, torch.Tensor) else np.array(reward_t, dtype=np.float32)
         dones = done_t.detach().cpu().numpy().astype(bool) if isinstance(done_t, torch.Tensor) else np.array(done_t, dtype=bool)
 
@@ -69,6 +83,7 @@ class GenesisVecEnv(VecEnv):
         self.actions_pending = None
 
         return obs_np, rewards, dones, per_env_infos
+
 
     def step(self, actions: np.ndarray):
         self.step_async(actions)
