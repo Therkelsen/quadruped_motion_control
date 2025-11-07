@@ -87,6 +87,11 @@ class GenesisVecEnv(VecEnv):
 
     def seed(self, seed: int = None):
         return
+    
+    def env_is_wrapped(self, wrapper_class) -> bool:
+        """Required by VecEnv: return whether the wrapped env(s) are wrapped by a given wrapper class."""
+        return False
+
 
     # SB3 VecEnv abstract methods
     def env_method(self, method_name, *args, indices=None, **kwargs):
