@@ -101,10 +101,6 @@ class GenesisVecEnv(VecEnv):
 
         return obs_np, rewards, dones, per_env_infos
 
-
-
-
-
     def step(self, actions: np.ndarray):
         self.step_async(actions)
         return self.step_wait()
