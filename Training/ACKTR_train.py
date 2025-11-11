@@ -1,27 +1,24 @@
-# train_a2c.py
+# train_acktr.py
 import os
 import argparse
 import pickle
 import shutil
 
 import genesis as gs
-from stable_baselines3 import A2C  # Or ACKTR if you want
+from stable_baselines3 import ACKTR
+
 from src.Gymwrapper import GenesisVecEnv
 from src.Configs import get_cfgs, get_train_cfg
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="A2C")
+    parser.add_argument("-e", "--exp_name", type=str, default="ACKTR")
     parser.add_argument("--total_timesteps", type=int, default=10_000_000)
     args = parser.parse_args()
 
-    # ---------------- Training parameters ----------------
-    num_envs = 32
-    n_steps = 10
-    gamma = 0.99
-    learning_rate = 3e-4
-    ent_coef = 0.01
-
+    num_envs = 1024
+    n_steps = 24  # ACKTR uses n_steps as well
+    batch_size = 2048
 
     gs.init(logging_level="warning")
 
@@ -30,15 +27,17 @@ def main():
         shutil.rmtree(log_dir)
     os.makedirs(log_dir, exist_ok=True)
 
-    # ---------------- Load configs ----------------
+    # Load configs from original go2_train.py
     env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, max_iterations=100)
 
     # Save configs for reproducibility
-    with open(f"{log_dir}/cfgs.pkl", "wb") as f:
-        pickle.dump([env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg], f)
+    pickle.dump(
+        [env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg],
+        open(f"{log_dir}/cfgs.pkl", "wb"),
+    )
 
-    # ---------------- Create Genesis VecEnv ----------------
+    # Create Genesis-based VecEnv
     vec_env = GenesisVecEnv(
         num_envs=num_envs,
         env_cfg=env_cfg,
@@ -48,24 +47,22 @@ def main():
         show_viewer=False,
     )
 
-    # ---------------- Define A2C ----------------
-    model = A2C(
+    # Define ACKTR
+    model = ACKTR(
         "MlpPolicy",
         vec_env,
         verbose=1,
         tensorboard_log=log_dir,
         n_steps=n_steps,
-        gamma=train_cfg["algorithm"].get("gamma", gamma),
-        learning_rate=train_cfg["algorithm"].get("learning_rate", learning_rate),
-        ent_coef=train_cfg["algorithm"].get("entropy_coef", ent_coef),
+        learning_rate=train_cfg["algorithm"]["learning_rate"],
+        gamma=train_cfg["algorithm"]["gamma"],
+        ent_coef=train_cfg["algorithm"]["entropy_coef"],
     )
 
-    # ---------------- Train ----------------
+    # Train
     model.learn(total_timesteps=args.total_timesteps)
-
-    # ---------------- Save model ----------------
-    model.save(os.path.join(log_dir, "a2c"))
-    print(f"✅ Model saved at {log_dir}/a2c.zip")
+    model.save(os.path.join(log_dir, "acktr"))
+    print(f"✅ Model saved at {log_dir}/acktr.zip")
 
     vec_env.close()
 
