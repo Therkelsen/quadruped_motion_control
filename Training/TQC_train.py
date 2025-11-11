@@ -78,9 +78,6 @@ def main():
         gradient_steps=gradient_steps,
         gamma=gamma,
         learning_rate=learning_rate,
-        action_noise=action_noise,
-        n_quantiles=25,                  # number of quantiles
-        top_quantiles_to_drop=2,         # how many top quantiles to drop per critic
     )
 
 
