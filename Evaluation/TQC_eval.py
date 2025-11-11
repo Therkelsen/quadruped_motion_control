@@ -4,7 +4,7 @@ import os
 import pickle
 import genesis as gs
 from sb3_contrib import TQC
-from stable_baselines3.common.vec_env import VecNormalize
+from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
 from src.Gymwrapper import Go2GymSingle
 
 def main():
@@ -29,7 +29,7 @@ def main():
     else:
         raise FileNotFoundError(f"cfgs.pkl not found in {log_dir}. Needed to reconstruct env config.")
 
-    # Create single env with viewer
+    # Create single env
     env = Go2GymSingle(
         env_cfg=env_cfg,
         obs_cfg=obs_cfg,
@@ -37,6 +37,9 @@ def main():
         command_cfg=command_cfg,
         show_viewer=True,
     )
+
+    # Wrap in DummyVecEnv for VecNormalize compatibility
+    env = DummyVecEnv([lambda: env])
 
     # Load VecNormalize stats if available
     vecnorm_path = os.path.join(log_dir, "vecnormalize.pkl")
@@ -54,7 +57,7 @@ def main():
 
     # Run evaluation episodes
     for ep in range(args.episodes):
-        obs, _ = env.reset()
+        obs = env.reset()
         done = False
         total_reward = 0.0
         while not done:
