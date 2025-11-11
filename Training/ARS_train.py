@@ -5,7 +5,7 @@ import pickle
 import shutil
 
 import genesis as gs
-from sb3_contrib import ARS
+from sb3_contrib.ars import ARS
 from src.Gymwrapper import GenesisVecEnv
 from src.Configs import get_cfgs, get_train_cfg
 
@@ -15,7 +15,7 @@ def main():
     parser.add_argument("--total_timesteps", type=int, default=10_000_000)
     args = parser.parse_args()
 
-    num_envs = 1024  # vectorized environments for parallel rollouts
+    num_envs = 1024  # vectorized environments
 
     gs.init(logging_level="warning")
 
@@ -28,11 +28,11 @@ def main():
     env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, max_iterations=100)
 
-    # Save configs for reproducibility
+    # Save configs
     with open(f"{log_dir}/cfgs.pkl", "wb") as f:
         pickle.dump([env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg], f)
 
-    # ---------------- Create Genesis-based VecEnv ----------------
+    # ---------------- Create VecEnv ----------------
     vec_env = GenesisVecEnv(
         num_envs=num_envs,
         env_cfg=env_cfg,
@@ -44,12 +44,8 @@ def main():
 
     # ---------------- Define ARS ----------------
     model = ARS(
-        policy="MlpPolicy",       # small MLP or "LinearPolicy"
+        policy="MlpPolicy",
         env=vec_env,
-        n_directions=16,          # number of perturbation directions per iteration
-        n_top_directions=8,       # best directions used to update policy
-        noise_std=0.03,           # perturbation noise
-        learning_rate=0.02,       # policy update step
         verbose=1,
         seed=42,
     )
