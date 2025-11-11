@@ -40,16 +40,6 @@ def main():
     env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, max_iterations=100)
 
-    # ✅ Modify reward scales to prioritize tracking velocities
-    reward_cfg["reward_scales"] = {
-        "tracking_lin_vel": 1.0,
-        "tracking_ang_vel": 1.0,
-        "lin_vel_z": -0.1,
-        "base_height": -1.0,
-        "action_rate": -0.01,
-        "similar_to_default": -0.05,
-    }
-
     # Save configs for reproducibility
     with open(f"{log_dir}/cfgs.pkl", "wb") as f:
         pickle.dump([env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg], f)
