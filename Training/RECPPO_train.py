@@ -12,13 +12,14 @@ from src.Configs import get_cfgs, get_train_cfg
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="RecurrentPPO")
+    parser.add_argument("-e", "--exp_name", type=str, default="RECPPO")
     parser.add_argument("--total_timesteps", type=int, default=10_000_000)
     args = parser.parse_args()
 
-    num_envs = 64  # vectorized environments
-    n_steps = 128  # number of steps per environment
-    batch_size = 256
+    num_envs = 128
+    n_steps = 256
+    batch_size = 512
+
 
     gs.init(logging_level="warning")
 

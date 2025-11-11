@@ -9,11 +9,11 @@ import genesis as gs
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="RecurrentPPO")
+    parser.add_argument("-e", "--exp_name", type=str, default="RECPPO")
     parser.add_argument("--episodes", type=int, default=5)
     args = parser.parse_args()
 
-    model_name = "recurrent_ppo"
+    model_name = "RECPPO"
 
     gs.init()  # initialize genesis
 
