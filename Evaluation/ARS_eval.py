@@ -2,7 +2,7 @@
 import argparse
 import os
 import pickle
-from sb3_contrib import ARS
+from sb3_contrib.ars import ARS
 from src.Gymwrapper import Go2GymSingle
 import genesis as gs
 
@@ -14,14 +14,13 @@ def main():
 
     model_name = "ars"
 
-    gs.init()  # initialize Genesis
+    gs.init()
 
     log_dir = f"logs/{args.exp_name}"
     model_path = os.path.join(log_dir, f"{model_name}.zip")
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model not found: {model_path}")
 
-    # load saved configs to reconstruct the environment
     cfgs_path = os.path.join(log_dir, "cfgs.pkl")
     if os.path.exists(cfgs_path):
         env_cfg, obs_cfg, reward_cfg, command_cfg, _ = pickle.load(open(cfgs_path, "rb"))
@@ -31,7 +30,6 @@ def main():
     print("Loading ARS model:", model_path)
     model = ARS.load(model_path)
 
-    # create single env with viewer
     env = Go2GymSingle(
         env_cfg=env_cfg,
         obs_cfg=obs_cfg,
