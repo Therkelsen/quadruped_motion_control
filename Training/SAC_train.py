@@ -59,7 +59,7 @@ def main():
         obs_cfg=obs_cfg,
         reward_cfg=reward_cfg,
         command_cfg=command_cfg,
-        show_viewer=True,
+        show_viewer=False,
     )
 
     # ---------------- Normalize observations & rewards ----------------
