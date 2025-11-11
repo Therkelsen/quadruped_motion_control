@@ -1,13 +1,9 @@
 import argparse
 import os
 import pickle
-
 import genesis as gs
 from stable_baselines3 import SAC
-from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
-
 from src.Gymwrapper import Go2GymSingle
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -15,41 +11,48 @@ def main():
     parser.add_argument("--episodes", type=int, default=5)
     args = parser.parse_args()
 
-    gs.init()  # initialize Genesis
+    gs.init()  # initialize Genesis (viewer etc.)
 
     log_dir = f"logs/{args.exp_name}"
     model_path = os.path.join(log_dir, "sac.zip")
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"SAC model not found: {model_path}")
 
     # ---------------- Load configs ----------------
     cfgs_path = os.path.join(log_dir, "cfgs.pkl")
     if not os.path.exists(cfgs_path):
-        raise FileNotFoundError(f"cfgs.pkl not found in {log_dir}.")
+        raise FileNotFoundError(f"cfgs.pkl not found in {log_dir}")
     env_cfg, obs_cfg, reward_cfg, command_cfg, _ = pickle.load(open(cfgs_path, "rb"))
 
     # ---------------- Create single environment ----------------
-    env_single = DummyVecEnv([lambda: Go2GymSingle(env_cfg, obs_cfg, reward_cfg, command_cfg, show_viewer=True)])
-    vecnorm_path = os.path.join(log_dir, "vecnormalize.pkl")
-    if os.path.exists(vecnorm_path):
-        env_single = VecNormalize.load(vecnorm_path, env_single)
-        env_single.training = False
-        env_single.norm_reward = False
+    env = Go2GymSingle(
+        env_cfg=env_cfg,
+        obs_cfg=obs_cfg,
+        reward_cfg=reward_cfg,
+        command_cfg=command_cfg,
+        show_viewer=True
+    )
 
-    model = SAC.load(model_path, env=env_single)
-    
+    # ---------------- Load SAC model ----------------
+    model = SAC.load(model_path, env=env)
+
     # ---------------- Run evaluation ----------------
     for ep in range(args.episodes):
-        obs = env_single.reset()
+        obs, _ = env.reset()
+        done = False
         total_reward = 0.0
-        done = [False]
-        while not done[0]:
+
+        while not done:
+            # deterministic actions
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, done, info = env_single.step(action)
-            total_reward += reward[0]
+            obs, reward, terminated, truncated, info = env.step(action)
+            total_reward += reward
+            done = terminated or truncated
+
         print(f"Episode {ep+1}/{args.episodes} — total_reward: {total_reward:.3f}")
 
-    env_single.close()
-    print("✅ Evaluation finished.")
-
+    env.close()
+    print("✅ SAC evaluation finished.")
 
 if __name__ == "__main__":
     main()

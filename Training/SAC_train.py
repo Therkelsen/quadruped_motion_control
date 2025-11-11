@@ -5,7 +5,6 @@ import shutil
 
 import genesis as gs
 from stable_baselines3 import SAC
-from stable_baselines3.common.vec_env import VecNormalize
 
 from src.Gymwrapper import GenesisVecEnv
 from src.Configs import get_cfgs, get_train_cfg
@@ -26,7 +25,6 @@ def main():
     train_freq = 64
     gradient_steps = 64
 
-
     gs.init(logging_level="warning")
 
     log_dir = f"logs/{args.exp_name}"
@@ -38,7 +36,7 @@ def main():
     env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, max_iterations=100)
 
-    # ✅ Modify reward scales to prioritize tracking velocities
+    # Reward scales
     reward_cfg["reward_scales"] = {
         "tracking_lin_vel": 1.0,
         "tracking_ang_vel": 1.0,
@@ -48,7 +46,7 @@ def main():
         "similar_to_default": -0.05,
     }
 
-    # Save configs for reproducibility
+    # Save configs
     with open(f"{log_dir}/cfgs.pkl", "wb") as f:
         pickle.dump([env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg], f)
 
@@ -60,14 +58,6 @@ def main():
         reward_cfg=reward_cfg,
         command_cfg=command_cfg,
         show_viewer=False,
-    )
-
-    # ---------------- Normalize observations & rewards ----------------
-    vec_env = VecNormalize(
-        vec_env,
-        norm_obs=True,
-        norm_reward=True,
-        clip_obs=10.0,
     )
 
     # ---------------- Define SAC ----------------
@@ -96,11 +86,9 @@ def main():
     # ---------------- Train ----------------
     model.learn(total_timesteps=args.total_timesteps)
 
-    # ---------------- Save model & VecNormalize stats ----------------
+    # ---------------- Save model ----------------
     model.save(os.path.join(log_dir, "sac"))
-    vec_env.save(os.path.join(log_dir, "vecnormalize.pkl"))
     print(f"✅ Model saved at {log_dir}/sac.zip")
-    print(f"✅ VecNormalize stats saved at {log_dir}/vecnormalize.pkl")
 
     vec_env.close()
 
