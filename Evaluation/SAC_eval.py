@@ -35,19 +35,7 @@ def main():
         show_viewer=True,
     )
 
-    # ---------------- Load VecNormalize stats ----------------
-    vecnorm_path = os.path.join(log_dir, "vecnormalize.pkl")
-    if os.path.exists(vecnorm_path):
-        print(f"Loading VecNormalize stats from {vecnorm_path}")
-        env = VecNormalize.load(vecnorm_path, env)
-        env.training = False
-        env.norm_reward = False
-    else:
-        print("⚠️ No vecnormalize.pkl found — running without normalization!")
-
-    # ---------------- Load trained SAC model ----------------
-    print(f"Loading SAC model from: {model_path}")
-    model = SAC.load(model_path, env=env)
+    model = SAC.load(model_path)
 
     # ---------------- Run evaluation ----------------
     for ep in range(args.episodes):

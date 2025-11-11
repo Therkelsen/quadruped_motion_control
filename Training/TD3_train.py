@@ -1,4 +1,3 @@
-# train_td3.py
 import os
 import argparse
 import pickle
@@ -8,6 +7,7 @@ import numpy as np
 import genesis as gs
 from stable_baselines3 import TD3
 from stable_baselines3.common.noise import NormalActionNoise
+from stable_baselines3.common.vec_env import VecNormalize
 
 from src.Gymwrapper import GenesisVecEnv
 from src.Configs import get_cfgs, get_train_cfg
@@ -19,7 +19,16 @@ def main():
     parser.add_argument("--total_timesteps", type=int, default=10_000_000)
     args = parser.parse_args()
 
-    num_envs = 1024
+    # ---------------- Environment + training setup ----------------
+    num_envs = 16  # or 32 if memory allows
+    replay_buffer_size = 3_000_000
+    batch_size = 512  # or 1024 if GPU memory allows
+    learning_starts = 30_000
+    tau = 0.005
+    train_freq = 128
+    gradient_steps = 128
+
+
     gs.init(logging_level="warning")
 
     log_dir = f"logs/{args.exp_name}"
@@ -27,17 +36,25 @@ def main():
         shutil.rmtree(log_dir)
     os.makedirs(log_dir, exist_ok=True)
 
-    # ✅ Load configs
+    # ---------------- Load configs ----------------
     env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, max_iterations=100)
 
-    # Save configs
-    pickle.dump(
-        [env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg],
-        open(f"{log_dir}/cfgs.pkl", "wb"),
-    )
+    # ✅ Modify reward scales to prioritize tracking velocities
+    reward_cfg["reward_scales"] = {
+        "tracking_lin_vel": 1.0,
+        "tracking_ang_vel": 1.0,
+        "lin_vel_z": -0.1,
+        "base_height": -1.0,
+        "action_rate": -0.01,
+        "similar_to_default": -0.05,
+    }
 
-    # ✅ Create Genesis-based VecEnv
+    # Save configs for reproducibility
+    with open(f"{log_dir}/cfgs.pkl", "wb") as f:
+        pickle.dump([env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg], f)
+
+    # ---------------- Create Genesis-based VecEnv ----------------
     vec_env = GenesisVecEnv(
         num_envs=num_envs,
         env_cfg=env_cfg,
@@ -47,27 +64,38 @@ def main():
         show_viewer=False,
     )
 
-    # ✅ Action noise for exploration (important for TD3)
+    # ---------------- Normalize observations & rewards ----------------
+    vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
+
+    # ---------------- Action noise ----------------
     n_actions = vec_env.action_space.shape[-1]
     action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
 
-    # ✅ Define TD3
+    # ---------------- Define TD3 ----------------
     model = TD3(
         "MlpPolicy",
         vec_env,
         verbose=1,
         tensorboard_log=log_dir,
+        buffer_size=replay_buffer_size,
+        batch_size=batch_size,
+        learning_starts=learning_starts,
+        tau=tau,
+        train_freq=train_freq,
+        gradient_steps=gradient_steps,
+        gamma=train_cfg["algorithm"].get("gamma", 0.99),
+        learning_rate=train_cfg["algorithm"].get("learning_rate", 3e-4),
         action_noise=action_noise,
-        learning_rate=train_cfg["algorithm"]["learning_rate"],
-        gamma=train_cfg["algorithm"]["gamma"],
-        buffer_size=1_000_000,
-        batch_size=256,
     )
 
-    # ✅ Train
+    # ---------------- Train ----------------
     model.learn(total_timesteps=args.total_timesteps)
+
+    # ---------------- Save model & VecNormalize stats ----------------
     model.save(os.path.join(log_dir, "td3"))
+    vec_env.save(os.path.join(log_dir, "vecnormalize.pkl"))
     print(f"✅ Model saved at {log_dir}/td3.zip")
+    print(f"✅ VecNormalize stats saved at {log_dir}/vecnormalize.pkl")
 
     vec_env.close()
 
