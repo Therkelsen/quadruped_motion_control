@@ -1,13 +1,15 @@
-# train_ars.py
+# ARS_train.py
 import os
 import argparse
 import pickle
 import shutil
 
 import genesis as gs
-from sb3_contrib.ars import ARS
+from sb3_contrib import ARS
+from stable_baselines3.common.vec_env import VecMonitor
 from src.Gymwrapper import GenesisVecEnv
 from src.Configs import get_cfgs, get_train_cfg
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -15,7 +17,13 @@ def main():
     parser.add_argument("--total_timesteps", type=int, default=10_000_000)
     args = parser.parse_args()
 
-    num_envs = 1024  # vectorized environments
+    # ---------------- Training parameters ----------------
+    num_envs = 64  # ARS supports vectorized envs, but very high numbers may be slow
+    n_steps = 1    # ARS uses one-step rollouts per perturbation
+    sigma = 0.05   # noise standard deviation
+    learning_rate = 0.02  # ARS learning rate
+    n_top_directions = 16
+    n_directions = 32
 
     gs.init(logging_level="warning")
 
@@ -28,11 +36,11 @@ def main():
     env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, max_iterations=100)
 
-    # Save configs
+    # Save configs for reproducibility
     with open(f"{log_dir}/cfgs.pkl", "wb") as f:
         pickle.dump([env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg], f)
 
-    # ---------------- Create VecEnv ----------------
+    # ---------------- Create Genesis-based VecEnv ----------------
     vec_env = GenesisVecEnv(
         num_envs=num_envs,
         env_cfg=env_cfg,
@@ -42,12 +50,20 @@ def main():
         show_viewer=False,
     )
 
+    # ---------------- Wrap in VecMonitor for ARS evaluation ----------------
+    vec_env = VecMonitor(vec_env)
+
     # ---------------- Define ARS ----------------
     model = ARS(
-        policy="MlpPolicy",
-        env=vec_env,
+        "MlpPolicy",
+        vec_env,
         verbose=1,
-        seed=42,
+        n_steps=n_steps,
+        sigma=sigma,
+        learning_rate=learning_rate,
+        n_directions=n_directions,
+        n_top_directions=n_top_directions,
+        tensorboard_log=log_dir,
     )
 
     # ---------------- Train ----------------
