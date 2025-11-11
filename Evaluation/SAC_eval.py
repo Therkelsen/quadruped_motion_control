@@ -42,9 +42,12 @@ def main():
         obs, _ = env.reset()
         done = False
         total_reward = 0.0
+
         while not done:
-            action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = env.step(action)
+            # Add batch dimension
+            action, _ = model.predict(obs[None, :], deterministic=True)
+            # Remove batch dimension for env.step
+            obs, reward, terminated, truncated, info = env.step(action[0])
             total_reward += reward
             done = terminated or truncated
         print(f"Episode {ep+1}/{args.episodes} — total_reward: {total_reward:.3f}")
