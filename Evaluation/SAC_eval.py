@@ -28,27 +28,21 @@ def main():
 
     # ---------------- Create single environment ----------------
     env_single = DummyVecEnv([lambda: Go2GymSingle(env_cfg, obs_cfg, reward_cfg, command_cfg, show_viewer=True)])
-
-    # Load VecNormalize stats
     vecnorm_path = os.path.join(log_dir, "vecnormalize.pkl")
     if os.path.exists(vecnorm_path):
         env_single = VecNormalize.load(vecnorm_path, env_single)
         env_single.training = False
-        env_single.norm_reward = False  # don't normalize rewards at evaluation
-    else:
-        print("⚠️ No vecnormalize.pkl found — running without normalization!")
+        env_single.norm_reward = False
 
-    # ---------------- Load SAC model ----------------
     model = SAC.load(model_path, env=env_single)
-
+    
     # ---------------- Run evaluation ----------------
     for ep in range(args.episodes):
         obs = env_single.reset()
-        done = [False]
         total_reward = 0.0
-
+        done = [False]
         while not done[0]:
-            action, _ = model.predict(obs, deterministic=False)
+            action, _ = model.predict(obs, deterministic=True)
             obs, reward, done, info = env_single.step(action)
             total_reward += reward[0]
         print(f"Episode {ep+1}/{args.episodes} — total_reward: {total_reward:.3f}")
