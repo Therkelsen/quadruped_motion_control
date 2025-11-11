@@ -61,8 +61,8 @@ def main():
 
     # ---------------- Train ----------------
     model.learn(total_timesteps=args.total_timesteps)
-    model.save(os.path.join(log_dir, "recurrent_ppo"))
-    print(f"✅ Model saved at {log_dir}/recurrent_ppo.zip")
+    model.save(os.path.join(log_dir, "RECPPO"))
+    print(f"✅ Model saved at {log_dir}/RECPPO.zip")
 
     vec_env.close()
 
