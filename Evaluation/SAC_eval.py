@@ -4,7 +4,7 @@ import pickle
 
 import genesis as gs
 from stable_baselines3 import SAC
-from stable_baselines3.common.vec_env import VecNormalize
+from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
 
 from src.Gymwrapper import Go2GymSingle
 
@@ -27,32 +27,33 @@ def main():
     env_cfg, obs_cfg, reward_cfg, command_cfg, _ = pickle.load(open(cfgs_path, "rb"))
 
     # ---------------- Create single environment ----------------
-    env = Go2GymSingle(
-        env_cfg=env_cfg,
-        obs_cfg=obs_cfg,
-        reward_cfg=reward_cfg,
-        command_cfg=command_cfg,
-        show_viewer=True,
-    )
+    env_single = DummyVecEnv([lambda: Go2GymSingle(env_cfg, obs_cfg, reward_cfg, command_cfg, show_viewer=True)])
 
-    model = SAC.load(model_path)
+    # Load VecNormalize stats
+    vecnorm_path = os.path.join(log_dir, "vecnormalize.pkl")
+    if os.path.exists(vecnorm_path):
+        env_single = VecNormalize.load(vecnorm_path, env_single)
+        env_single.training = False
+        env_single.norm_reward = False  # don't normalize rewards at evaluation
+    else:
+        print("⚠️ No vecnormalize.pkl found — running without normalization!")
+
+    # ---------------- Load SAC model ----------------
+    model = SAC.load(model_path, env=env_single)
 
     # ---------------- Run evaluation ----------------
     for ep in range(args.episodes):
-        obs, _ = env.reset()
-        done = False
+        obs = env_single.reset()
+        done = [False]
         total_reward = 0.0
 
-        while not done:
-            # Add batch dimension
-            action, _ = model.predict(obs[None, :], deterministic=True)
-            # Remove batch dimension for env.step
-            obs, reward, terminated, truncated, info = env.step(action[0])
-            total_reward += reward
-            done = terminated or truncated
+        while not done[0]:
+            action, _ = model.predict(obs, deterministic=True)
+            obs, reward, done, info = env_single.step(action)
+            total_reward += reward[0]
         print(f"Episode {ep+1}/{args.episodes} — total_reward: {total_reward:.3f}")
 
-    env.close()
+    env_single.close()
     print("✅ Evaluation finished.")
 
 
