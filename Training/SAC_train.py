@@ -18,7 +18,7 @@ def main():
     args = parser.parse_args()
 
     # ---------------- Environment + training setup ----------------
-    num_envs = 4  # SAC is off-policy; few envs are sufficient
+    num_envs = 32  # SAC is off-policy; few envs are sufficient
     replay_buffer_size = 1_000_000
     sac_batch_size = 256
     learning_starts = 10_000
