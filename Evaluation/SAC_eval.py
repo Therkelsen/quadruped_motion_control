@@ -48,7 +48,7 @@ def main():
         total_reward = 0.0
 
         while not done[0]:
-            action, _ = model.predict(obs, deterministic=True)
+            action, _ = model.predict(obs, deterministic=False)
             obs, reward, done, info = env_single.step(action)
             total_reward += reward[0]
         print(f"Episode {ep+1}/{args.episodes} — total_reward: {total_reward:.3f}")
