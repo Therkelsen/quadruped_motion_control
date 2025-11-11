@@ -1,4 +1,3 @@
-# SAC_train_fixed.py
 import os
 import argparse
 import pickle
@@ -6,41 +5,26 @@ import shutil
 
 import genesis as gs
 from stable_baselines3 import SAC
-from stable_baselines3.common.vec_env import VecNormalize, VecEnvWrapper
+from stable_baselines3.common.vec_env import VecNormalize
 
 from src.Gymwrapper import GenesisVecEnv
 from src.Configs import get_cfgs, get_train_cfg
 
 
-# ---------------- Reward scaling wrapper ----------------
-class RewardScaling(VecEnvWrapper):
-    """Scale rewards from a VecEnv by a constant factor."""
-    def __init__(self, venv, scale: float = 1.0):
-        super().__init__(venv)
-        self.scale = scale
-
-    def step_wait(self):
-        obs, rewards, dones, infos = self.venv.step_wait()
-        rewards = rewards * self.scale
-        return obs, rewards, dones, infos
-
-
-# ---------------- Main training ----------------
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--exp_name", type=str, default="go2-walking-sb3")
     parser.add_argument("--total_timesteps", type=int, default=10_000_000)
     args = parser.parse_args()
 
-    # Training hyperparameters
-    num_envs = 32
+    # ---------------- Environment + training setup ----------------
+    num_envs = 4  # SAC is off-policy; few envs are sufficient
     replay_buffer_size = 1_000_000
     sac_batch_size = 256
-    learning_starts = 100_000
+    learning_starts = 10_000
     tau = 0.005
     train_freq = 64
     gradient_steps = 64
-    reward_scale_factor = 20.0  # scale small rewards
 
     gs.init(logging_level="warning")
 
@@ -49,15 +33,25 @@ def main():
         shutil.rmtree(log_dir)
     os.makedirs(log_dir, exist_ok=True)
 
-    # Load configs
+    # ---------------- Load configs ----------------
     env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, max_iterations=100)
+
+    # ✅ Modify reward scales to prioritize tracking velocities
+    reward_cfg["reward_scales"] = {
+        "tracking_lin_vel": 1.0,
+        "tracking_ang_vel": 1.0,
+        "lin_vel_z": -0.1,
+        "base_height": -1.0,
+        "action_rate": -0.01,
+        "similar_to_default": -0.05,
+    }
 
     # Save configs for reproducibility
     with open(f"{log_dir}/cfgs.pkl", "wb") as f:
         pickle.dump([env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg], f)
 
-    # ---------------- Create Genesis VecEnv ----------------
+    # ---------------- Create Genesis-based VecEnv ----------------
     vec_env = GenesisVecEnv(
         num_envs=num_envs,
         env_cfg=env_cfg,
@@ -68,15 +62,14 @@ def main():
     )
 
     # ---------------- Normalize observations & rewards ----------------
-    vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
+    vec_env = VecNormalize(
+        vec_env,
+        norm_obs=True,
+        norm_reward=True,
+        clip_obs=10.0,
+    )
 
-    # Save VecNormalize stats immediately in case of early termination
-    vec_env.save(os.path.join(log_dir, "vecnormalize.pkl"))
-
-    # ---------------- Reward scaling wrapper ----------------
-    vec_env = RewardScaling(vec_env, scale=reward_scale_factor)
-
-    # ---------------- Define SAC model ----------------
+    # ---------------- Define SAC ----------------
     ent_coef = train_cfg["algorithm"].get("entropy_coef", "auto")
     learning_rate = train_cfg["algorithm"].get("learning_rate", 3e-4)
     gamma = train_cfg["algorithm"].get("gamma", 0.99)
@@ -102,9 +95,9 @@ def main():
     # ---------------- Train ----------------
     model.learn(total_timesteps=args.total_timesteps)
 
-    # ---------------- Save model and VecNormalize ----------------
+    # ---------------- Save model & VecNormalize stats ----------------
     model.save(os.path.join(log_dir, "sac"))
-    vec_env.venv.save(os.path.join(log_dir, "vecnormalize.pkl"))  # unwrap before saving
+    vec_env.save(os.path.join(log_dir, "vecnormalize.pkl"))
     print(f"✅ Model saved at {log_dir}/sac.zip")
     print(f"✅ VecNormalize stats saved at {log_dir}/vecnormalize.pkl")
 
