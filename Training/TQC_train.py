@@ -64,6 +64,7 @@ def main():
     action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=sigma * np.ones(n_actions))
 
     # ---------------- Define TQC ----------------
+    # Define TQC (fixed)
     model = TQC(
         "MlpPolicy",
         vec_env,
@@ -78,9 +79,10 @@ def main():
         gamma=gamma,
         learning_rate=learning_rate,
         action_noise=action_noise,
-        n_critics=2,       # standard
-        top_quantiles_to_drop_per_critic=2,
+        n_quantiles=25,                  # number of quantiles
+        top_quantiles_to_drop=2,         # how many top quantiles to drop per critic
     )
+
 
     # ---------------- Train ----------------
     model.learn(total_timesteps=args.total_timesteps)
