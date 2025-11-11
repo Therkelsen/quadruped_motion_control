@@ -56,15 +56,15 @@ def main():
     model = TQC.load(model_path, env=env)
 
     # Run evaluation episodes
+    # Run evaluation episodes
     for ep in range(args.episodes):
         obs = env.reset()
         done = False
         total_reward = 0.0
         while not done:
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = env.step(action)
-            total_reward += reward
-            done = terminated or truncated
+            obs, reward, done, info = env.step(action)  # <- 4 values now
+            total_reward += reward[0]  # reward is an array from VecEnv
         print(f"Episode {ep+1}/{args.episodes} — total_reward: {total_reward:.3f}")
 
     env.close()
