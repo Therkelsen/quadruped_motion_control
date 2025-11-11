@@ -18,13 +18,14 @@ def main():
     args = parser.parse_args()
 
     # ---------------- Environment + training setup ----------------
-    num_envs = 32  # SAC is off-policy; few envs are sufficient
-    replay_buffer_size = 1_000_000
-    sac_batch_size = 256
-    learning_starts = 10_000
+    num_envs = 32
+    replay_buffer_size = 2_000_000
+    sac_batch_size = 512
+    learning_starts = 20_000
     tau = 0.005
     train_freq = 64
     gradient_steps = 64
+
 
     gs.init(logging_level="warning")
 
