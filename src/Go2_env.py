@@ -17,7 +17,7 @@ class Go2Env:
         self.num_commands = command_cfg["num_commands"]
         self.device = gs.device
 
-        self.simulate_action_latency = True  # there is a 1 step latency on real robot
+        self.simulate_action_latency = False  # there is a 1 step latency on real robot
         self.dt = 0.02  # control frequency on real robot is 50hz
         self.max_episode_length = math.ceil(env_cfg["episode_length_s"] / self.dt)
 
@@ -121,13 +121,20 @@ class Go2Env:
         self.commands[envs_idx, 2] = gs_rand_float(*self.command_cfg["ang_vel_range"], (len(envs_idx),), gs.device)
 
     def step(self, actions):
+        # --- Logging setup ---
+        log_interval = 1000  # print every 1000 steps
+        if not hasattr(self, "_log_counter"):
+            self._log_counter = 0
+        self._log_counter += 1
+
+        # --- Clip and execute actions ---
         self.actions = torch.clip(actions, -self.env_cfg["clip_actions"], self.env_cfg["clip_actions"])
         exec_actions = self.last_actions if self.simulate_action_latency else self.actions
         target_dof_pos = exec_actions * self.env_cfg["action_scale"] + self.default_dof_pos
         self.robot.control_dofs_position(target_dof_pos, self.motors_dof_idx)
         self.scene.step()
 
-        # update buffers
+        # --- Update simulation buffers ---
         self.episode_length_buf += 1
         self.base_pos[:] = self.robot.get_pos()
         self.base_quat[:] = self.robot.get_quat()
@@ -143,7 +150,7 @@ class Go2Env:
         self.dof_pos[:] = self.robot.get_dofs_position(self.motors_dof_idx)
         self.dof_vel[:] = self.robot.get_dofs_velocity(self.motors_dof_idx)
 
-        # resample commands
+        # --- Command resampling ---
         envs_idx = (
             (self.episode_length_buf % int(self.env_cfg["resampling_time_s"] / self.dt) == 0)
             .nonzero(as_tuple=False)
@@ -151,7 +158,7 @@ class Go2Env:
         )
         self._resample_commands(envs_idx)
 
-        # check termination and reset
+        # --- Check termination & reset ---
         self.reset_buf = self.episode_length_buf > self.max_episode_length
         self.reset_buf |= torch.abs(self.base_euler[:, 1]) > self.env_cfg["termination_if_pitch_greater_than"]
         self.reset_buf |= torch.abs(self.base_euler[:, 0]) > self.env_cfg["termination_if_roll_greater_than"]
@@ -162,14 +169,14 @@ class Go2Env:
 
         self.reset_idx(self.reset_buf.nonzero(as_tuple=False).reshape((-1,)))
 
-        # compute reward
+        # --- Reward computation ---
         self.rew_buf[:] = 0.0
         for name, reward_func in self.reward_functions.items():
             rew = reward_func() * self.reward_scales[name]
             self.rew_buf += rew
             self.episode_sums[name] += rew
 
-        # compute observations
+        # --- Observation computation ---
         self.obs_buf = torch.cat(
             [
                 self.base_ang_vel * self.obs_scales["ang_vel"],  # 3
@@ -187,7 +194,21 @@ class Go2Env:
 
         self.extras["observations"]["critic"] = self.obs_buf
 
+        # --- Log action stats occasionally ---
+        if self._log_counter % log_interval == 0:
+            try:
+                # compute across all environments
+                action_mean = self.actions.mean().item()
+                action_std = self.actions.std().item()
+                print(
+                    f"[Go2Env] Step {int(self.episode_length_buf.mean().item())} | "
+                    f"Action mean: {action_mean:.4f}, std: {action_std:.4f}"
+                )
+            except Exception as e:
+                print(f"[Go2Env] Logging error: {e}")
+
         return self.obs_buf, self.rew_buf, self.reset_buf, self.extras
+
 
     def get_observations(self):
         self.extras["observations"]["critic"] = self.obs_buf
