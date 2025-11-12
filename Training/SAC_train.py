@@ -91,6 +91,7 @@ def main():
     target_entropy = -0.5 * vec_env.action_space.shape[0]
     
     #TEST
+    ent_coef = "auto"
     target_entropy = "auto"
     
     # ========================================================================
