@@ -7,7 +7,7 @@ from src.Gymwrapper import Go2GymSingle
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="go2-walking-sb3")
+    parser.add_argument("-e", "--exp_name", type=str, default="SAC")
     parser.add_argument("--episodes", type=int, default=5)
     args = parser.parse_args()
 
