@@ -9,8 +9,8 @@ gs.init()
 env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
 
 # --- 🔧 Increase actuation strength for visibility ---
-env_cfg["action_scale"] = 0.5       # was 0.25 → stronger joint movement
-env_cfg["kp"] = 80.0                # stiffer PD control
+env_cfg["action_scale"] = 0.35      # was 0.25 → stronger joint movement
+env_cfg["kp"] = 60.0                # stiffer PD control
 env_cfg["kd"] = 1.0
 env_cfg["simulate_action_latency"] = False  # remove delay for clarity
 
