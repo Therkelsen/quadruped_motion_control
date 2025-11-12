@@ -9,6 +9,34 @@ from stable_baselines3 import SAC
 from src.Gymwrapper import GenesisVecEnv
 from src.Configs import get_cfgs, get_train_cfg
 
+from stable_baselines3.common.callbacks import BaseCallback
+import numpy as np
+
+class ActionLogger(BaseCallback):
+    def __init__(self, log_interval=5000, verbose=0):
+        super().__init__(verbose)
+        self.log_interval = log_interval
+        self.counter = 0
+
+    def _on_step(self):
+        self.counter += 1
+        if self.counter % self.log_interval == 0:
+            try:
+                env = self.training_env
+                while hasattr(env, 'envs'):
+                    env = env.envs[0]
+                if hasattr(env, 'env'):
+                    env = env.env
+                a = getattr(env, "actions", None)
+                if a is not None:
+                    a_np = a.detach().cpu().numpy()
+                    print(f"[ActionLogger] step={self.counter} | mean={a_np.mean():.4f}, std={a_np.std():.4f}")
+            except Exception as e:
+                print(f"[ActionLogger] log error: {e}")
+        return True
+
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--exp_name", type=str, default="SAC")
@@ -37,6 +65,9 @@ def main():
     train_cfg = get_train_cfg(args.exp_name, max_iterations=100)
     
     # Test
+    env_cfg["action_scale"] = 0.35   # strong enough to move but not chaotic
+    env_cfg["kp"] = 60.0
+    env_cfg["kd"] = 1.0
     env_cfg["simulate_action_latency"] = False
 
     # Save configs
@@ -83,7 +114,7 @@ def main():
     )
 
     # ---------------- Train ----------------
-    model.learn(total_timesteps=args.total_timesteps)
+    model.learn(total_timesteps=args.total_timesteps, callback=ActionLogger())
 
     # ---------------- Save model ----------------
     model.save(os.path.join(log_dir, "sac"))
