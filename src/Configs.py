@@ -105,7 +105,7 @@ def get_cfgs():
         "base_height_target": 0.3,
         "feet_height_target": 0.075,
         "reward_scales": {
-            "tracking_lin_vel": 2.0,
+            "tracking_lin_vel": 5.0,
             "tracking_ang_vel": 0.5,
             "lin_vel_z": -1.0,
             "base_height": -5.0,
