@@ -31,7 +31,7 @@ def main():
     # ✅ Load configs from original go2_train.py
     env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, max_iterations=100)
-
+    
     # Save configs for reproducibility (like RSL-RL)
     pickle.dump(
         [env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg],
