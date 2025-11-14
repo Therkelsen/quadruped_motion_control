@@ -57,12 +57,12 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
             step_out = env.step(action)
 
             # Reward components from the actual environment
-            track_vel_rew = unwrapped_env._reward_tracking_lin_vel().item()
-            track_ang_rew = unwrapped_env._reward_tracking_ang_vel().item()
-            lin_z_rew = unwrapped_env._reward_lin_vel_z().item()
-            action_rate_rew = unwrapped_env._reward_action_rate().item()
-            similar_default_rew = unwrapped_env._reward_similar_to_default().item()
-            base_height_rew = unwrapped_env._reward_base_height().item()
+            track_vel_rew = unwrapped_env.env._reward_tracking_lin_vel().item()
+            track_ang_rew = unwrapped_env.env._reward_tracking_ang_vel().item()
+            lin_z_rew = unwrapped_env.env._reward_lin_vel_z().item()
+            action_rate_rew = unwrapped_env.env._reward_action_rate().item()
+            similar_default_rew = unwrapped_env.env._reward_similar_to_default().item()
+            base_height_rew = unwrapped_env.env._reward_base_height().item()
 
             test_reward += (
                 track_vel_rew
