@@ -23,16 +23,15 @@ def load_env(log_dir):
         obs_cfg=obs_cfg,
         reward_cfg=reward_cfg,
         command_cfg=command_cfg,
-        show_viewer=False,    # disable viewer for batch eval
+        show_viewer=False,
     )
     return env, env_cfg, obs_cfg, reward_cfg, command_cfg
 
 
 def evaluate_model(model, env, episodes=10, vec_env=False):
-    """Evaluate a model for a given number of episodes and log reward components."""
+    """Evaluate a model for a given number of episodes and log cumulative reward components."""
     results = []
 
-    # Helper to get the actual environment inside VecEnv
     def get_unwrapped_env(env):
         if hasattr(env, "envs"):  # VecEnv
             return env.envs[0]
@@ -55,26 +54,19 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
 
         done = False
         ep_length = 0
-        ep_reward_scaled = 0.0
+        ep_rewards = {k: 0.0 for k in reward_scales}  # cumulative per component
 
         while not done:
-            # Deterministic actions
             action, _ = model.predict(obs, deterministic=True)
             step_out = env.step(action)
 
-            # Compute scaled reward components
-            track_vel = unwrapped_env.env._reward_tracking_lin_vel().item() * reward_scales["tracking_lin_vel"]
-            track_ang = unwrapped_env.env._reward_tracking_ang_vel().item() * reward_scales["tracking_ang_vel"]
-            lin_z = unwrapped_env.env._reward_lin_vel_z().item() * reward_scales["lin_vel_z"]
-            base_height = unwrapped_env.env._reward_base_height().item() * reward_scales["base_height"]
-            action_rate = unwrapped_env.env._reward_action_rate().item() * reward_scales["action_rate"]
-            similar_default = unwrapped_env.env._reward_similar_to_default().item() * reward_scales["similar_to_default"]
-
-            step_reward = track_vel + track_ang + lin_z + base_height + action_rate + similar_default
-            ep_reward_scaled += step_reward
-
-            # Print reward breakdown
-            print(f"Episode Step Rewards — lin_vel: {track_vel:.3f}, ang_vel: {track_ang:.3f}, lin_z: {lin_z:.3f}, base_height: {base_height:.3f}, action_rate: {action_rate:.3f}, similar_default: {similar_default:.3f}, total_step: {step_reward:.3f}")
+            # Compute and scale rewards
+            ep_rewards["tracking_lin_vel"] += unwrapped_env.env._reward_tracking_lin_vel().item() * reward_scales["tracking_lin_vel"]
+            ep_rewards["tracking_ang_vel"] += unwrapped_env.env._reward_tracking_ang_vel().item() * reward_scales["tracking_ang_vel"]
+            ep_rewards["lin_vel_z"] += unwrapped_env.env._reward_lin_vel_z().item() * reward_scales["lin_vel_z"]
+            ep_rewards["base_height"] += unwrapped_env.env._reward_base_height().item() * reward_scales["base_height"]
+            ep_rewards["action_rate"] += unwrapped_env.env._reward_action_rate().item() * reward_scales["action_rate"]
+            ep_rewards["similar_to_default"] += unwrapped_env.env._reward_similar_to_default().item() * reward_scales["similar_to_default"]
 
             # Unpack step outputs depending on env type
             if vec_env:
@@ -86,17 +78,12 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
 
             ep_length += 1
 
-        # Episode summary
-        print(f"Episode {ep+1}/{episodes} — Scaled Reward: {ep_reward_scaled:.3f}, Length: {ep_length}")
+        ep_total = sum(ep_rewards.values())
+        print(f"Episode {ep+1}/{episodes} — Total Reward: {ep_total:.3f}, Length: {ep_length}")
         results.append({
-            "total": ep_reward_scaled,
+            "total": ep_total,
             "length": ep_length,
-            "tracking_lin_vel": track_vel,
-            "tracking_ang_vel": track_ang,
-            "lin_vel_z": lin_z,
-            "base_height": base_height,
-            "action_rate": action_rate,
-            "similar_to_default": similar_default,
+            **ep_rewards
         })
 
     return results
@@ -106,18 +93,18 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--episodes", type=int, default=30)
     parser.add_argument("--exp_root", type=str, default="logs")
-    parser.add_argument("--output", type=str, default="evaluation_results.csv")
+    parser.add_argument("--output_dir", type=str, default="evaluation_results")
     args = parser.parse_args()
 
     gs.init()
+
+    os.makedirs(args.output_dir, exist_ok=True)
 
     algorithms = [
         ("td3", TD3),
         ("ppo", PPO),
         ("sac", SAC),
     ]
-
-    all_results = []
 
     for algo_name, algo_class in algorithms:
         print(f"\n=== Evaluating {algo_name.upper()} ===")
@@ -158,36 +145,30 @@ def main():
         # Evaluate model
         results = evaluate_model(model, env, args.episodes, vec_env)
 
-        # Store results with model type
-        results = evaluate_model(model, env, args.episodes, vec_env)
-        for i, r in enumerate(results):
-            all_results.append([
-                algo_name.upper(),
-                i + 1,
-                r["total"],
-                r["length"],
-                r["tracking_lin_vel"],
-                r["tracking_ang_vel"],
-                r["lin_vel_z"],
-                r["base_height"],
-                r["action_rate"],
-                r["similar_to_default"]
+        # Write results to CSV per model
+        csv_path = os.path.join(args.output_dir, f"{algo_name.upper()}_results.csv")
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "episode", "total_reward", "length",
+                "tracking_lin_vel", "tracking_ang_vel", "lin_vel_z",
+                "base_height", "action_rate", "similar_to_default"
             ])
+            for i, r in enumerate(results):
+                writer.writerow([
+                    i + 1,
+                    r["total"],
+                    r["length"],
+                    r["tracking_lin_vel"],
+                    r["tracking_ang_vel"],
+                    r["lin_vel_z"],
+                    r["base_height"],
+                    r["action_rate"],
+                    r["similar_to_default"]
+                ])
 
-        print(f"Finished {algo_name.upper()} evaluation.")
-
+        print(f"Finished {algo_name.upper()} evaluation. Results saved to {csv_path}")
         env.close()
-
-    # Write CSV
-    with open(args.output, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([
-            "model", "episode", "reward", "length",
-            "tracking_lin_vel", "tracking_ang_vel", "lin_vel_z", "base_height", "action_rate", "similar_to_default"
-        ])
-        writer.writerows(all_results)
-
-    print(f"\n✅ Evaluation complete. Results saved to {args.output}")
 
 
 if __name__ == "__main__":
