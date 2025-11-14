@@ -94,7 +94,7 @@ def main():
         
         print("Episode length check:")
         print(env.env.max_episode_length)
-        print(env_cfg["max_episode_length"])
+        print(env_cfg["episode_length_s"])
         
         # TD3 requires VecNormalize + DummyVecEnv
         if algo_name == "TD3":
