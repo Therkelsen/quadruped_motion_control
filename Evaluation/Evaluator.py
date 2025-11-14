@@ -7,8 +7,6 @@ import genesis as gs
 
 from stable_baselines3 import PPO, SAC, TD3
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
-import test
-
 from src.Gymwrapper import Go2GymSingle
 
 
@@ -31,15 +29,24 @@ def load_env(log_dir):
 
 
 def evaluate_model(model, env, episodes=10, vec_env=False):
-    """Evaluate a model for a given number of episodes."""
+    """Evaluate a model for a given number of episodes with proper reward scales."""
     results = []
+
+    # Reward scaling factors
+    reward_scales = {
+        "tracking_lin_vel": 5.0,
+        "tracking_ang_vel": 0.5,
+        "lin_vel_z": -1.0,
+        "base_height": -5.0,
+        "action_rate": -0.005,
+        "similar_to_default": -0.1,
+    }
 
     # Helper to get the actual environment inside VecEnv
     def get_unwrapped_env(env):
         if hasattr(env, "envs"):  # VecEnv
             return env.envs[0]
-        else:
-            return env
+        return env
 
     unwrapped_env = get_unwrapped_env(env)
 
@@ -52,17 +59,17 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
         test_reward = 0.0
 
         while not done:
-            # TD3/SAC deterministic evaluation
+            # Deterministic action for TD3/SAC evaluation
             action, _ = model.predict(obs, deterministic=True)
             step_out = env.step(action)
 
-            # Reward components from the actual environment
-            track_vel_rew = unwrapped_env.env._reward_tracking_lin_vel().item()
-            track_ang_rew = unwrapped_env.env._reward_tracking_ang_vel().item()
-            lin_z_rew = unwrapped_env.env._reward_lin_vel_z().item()
-            action_rate_rew = unwrapped_env.env._reward_action_rate().item()
-            similar_default_rew = unwrapped_env.env._reward_similar_to_default().item()
-            base_height_rew = unwrapped_env.env._reward_base_height().item()
+            # Compute individual rewards with scaling
+            track_vel_rew = unwrapped_env.env._reward_tracking_lin_vel().item() * reward_scales["tracking_lin_vel"]
+            track_ang_rew = unwrapped_env.env._reward_tracking_ang_vel().item() * reward_scales["tracking_ang_vel"]
+            lin_z_rew = unwrapped_env.env._reward_lin_vel_z().item() * reward_scales["lin_vel_z"]
+            action_rate_rew = unwrapped_env.env._reward_action_rate().item() * reward_scales["action_rate"]
+            similar_default_rew = unwrapped_env.env._reward_similar_to_default().item() * reward_scales["similar_to_default"]
+            base_height_rew = unwrapped_env.env._reward_base_height().item() * reward_scales["base_height"]
 
             test_reward += (
                 track_vel_rew
@@ -81,7 +88,6 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
             print(f"Similar to Default Pose Reward: {similar_default_rew:.3f}")
             print(f"Base Height Reward: {base_height_rew:.3f}")
 
-
             # Unpack step outputs depending on environment type
             if vec_env:
                 obs, reward, dones, infos = step_out
@@ -96,12 +102,11 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
 
         # Episode summary
         print(f"Episode {ep+1}/{episodes} — Reward: {ep_reward:.3f}, Length: {ep_length}")
-        print(f"Test_reward {test_reward:.3f}")
+        print(f"Scaled Test Reward: {test_reward:.3f}")
 
         results.append((ep_reward, ep_length))
 
     return results
-
 
 
 def main():
@@ -127,20 +132,15 @@ def main():
         log_dir = os.path.join(args.exp_root, algo_name.upper())
         model_path = os.path.join(log_dir, f"{algo_name}.zip")
 
-        print(model_path)
-        
         if not os.path.exists(model_path):
             print(f"⚠️ Model for {algo_name} not found, skipping.")
             continue
 
         # Load environment configs
         env, env_cfg, obs_cfg, reward_cfg, command_cfg = load_env(log_dir)
-        
-        print("Episode length check:")
-        print(env.env.max_episode_length)
-        print(env_cfg["episode_length_s"])
-        
+
         # TD3 requires VecNormalize + DummyVecEnv
+        vec_env = False
         if algo_name == "td3":
             def make_env():
                 return Go2GymSingle(
@@ -152,17 +152,12 @@ def main():
                 )
 
             env = DummyVecEnv([make_env])
-
             vecnorm_path = os.path.join(log_dir, "vecnormalize.pkl")
             if os.path.exists(vecnorm_path):
                 env = VecNormalize.load(vecnorm_path, env)
                 env.training = False
                 env.norm_reward = False
-                vec_env = True
-            else:
-                vec_env = True
-        else:
-            vec_env = False
+            vec_env = True
 
         # Load model
         model = algo_class.load(model_path, env if vec_env else None)
