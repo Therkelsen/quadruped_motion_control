@@ -201,7 +201,7 @@ class Go2Env:
                 action_mean = self.actions.mean().item()
                 action_std = self.actions.std().item()
                 print(
-                    f"[Go2Env] Step {int(self.episode_length_buf.mean().item())} | "
+                    f"[Go2Env] Step {int(self.episode_length_buf.float().mean().item())} | "
                     f"Action mean: {action_mean:.4f}, std: {action_std:.4f}"
                 )
             except Exception as e:

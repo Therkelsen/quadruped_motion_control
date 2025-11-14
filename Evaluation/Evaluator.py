@@ -54,7 +54,7 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
 
             ep_reward += reward
             ep_length += 1
-
+        print(f"Episode {ep+1}/{episodes} — Reward: {ep_reward:.3f}, Length: {ep_length}")
         results.append((ep_reward, ep_length))
 
     return results
@@ -91,7 +91,11 @@ def main():
 
         # Load environment configs
         env, env_cfg, obs_cfg, reward_cfg, command_cfg = load_env(log_dir)
-
+        
+        print("Episode length check:")
+        print(env.env.max_episode_length)
+        print(env_cfg["max_episode_length"])
+        
         # TD3 requires VecNormalize + DummyVecEnv
         if algo_name == "TD3":
             def make_env():
