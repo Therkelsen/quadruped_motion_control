@@ -2,6 +2,9 @@
 tensorboard/
 models/
 
+# Data analysis figures
+*/figures/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

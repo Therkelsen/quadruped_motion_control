@@ -1,6 +1,7 @@
 argpass
 genesis-world
 matplotlib
+numpy
 pandas
 rsl-rl-lib==2.2.4
 sb3_contrib
