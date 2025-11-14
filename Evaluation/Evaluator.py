@@ -70,9 +70,9 @@ def main():
     gs.init()
 
     algorithms = [
-        ("PPO", PPO),
-        ("SAC", SAC),
-        ("TD3", TD3),
+        ("ppo", PPO),
+        ("sac", SAC),
+        ("td3", TD3),
     ]
 
     all_results = []
@@ -83,6 +83,8 @@ def main():
         log_dir = os.path.join(args.exp_root, algo_name.upper())
         model_path = os.path.join(log_dir, f"{algo_name}.zip")
 
+        print(model_path)
+        
         if not os.path.exists(model_path):
             print(f"⚠️ Model for {algo_name} not found, skipping.")
             continue
