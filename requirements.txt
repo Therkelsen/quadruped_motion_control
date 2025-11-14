@@ -3,3 +3,4 @@ torch
 stable-baselines3
 rsl-rl-lib==2.2.4
 tensorboard
+sb3_contrib

@@ -101,10 +101,6 @@ class GenesisVecEnv(VecEnv):
 
         return obs_np, rewards, dones, per_env_infos
 
-
-
-
-
     def step(self, actions: np.ndarray):
         self.step_async(actions)
         return self.step_wait()
@@ -158,7 +154,8 @@ class Go2GymSingle(gym.Env):
         self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(env_cfg["num_actions"],), dtype=np.float32)
         self.device = gs.device if hasattr(gs, "device") else torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def reset(self):
+    # Accept seed and any other kwargs
+    def reset(self, seed=None, **kwargs):
         obs, _ = self.env.reset()
         return obs[0].detach().cpu().numpy(), {}
 
@@ -171,3 +168,4 @@ class Go2GymSingle(gym.Env):
         terminated = bool(done[0].item()) if isinstance(done, torch.Tensor) else bool(done[0])
         truncated = False
         return obs_np, reward_f, terminated, truncated, info
+
