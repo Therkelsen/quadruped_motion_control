@@ -1,0 +1,6 @@
+model,steps_trained,episode_id,total_reward,tracking_lin_vel,tracking_ang_vel,lin_vel_z,base_height,action_rate,similar_to_default,episode_length,distance_travelled
+PPO,2500000,1,412.5,180.3,92.1,5.2,34.8,-22.4,122.5,12.4,3.18
+PPO,2500000,2,387.4,170.9,88.3,4.7,35.1,-25.8,114.2,11.7,2.85
+PPO,2500000,3,431.2,189.7,95.0,6.1,33.9,-23.7,130.2,13.3,3.44
+PPO,2500000,4,398.6,175.4,90.2,4.9,34.4,-24.9,118.6,12.0,2.97
+PPO,2500000,5,422.1,183.5,91.8,5.5,34.6,-22.1,129.0,12.8,3.32
