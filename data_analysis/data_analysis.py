@@ -6,254 +6,209 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.stats as stats
+import seaborn as sns
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+
+def load_csv_file(file_path):
+    """Load a single CSV and return (filename, DataFrame)."""
+    df = pd.read_csv(file_path)
+    filename = os.path.basename(file_path)
+    return filename, df
 
 
 def load_csv_folder(folder_path: str):
-    """Load all CSV files in a folder into a dict of dataframes."""
+    """Load all CSV files in a folder into a dict of DataFrames using threads."""
     if not os.path.isdir(folder_path):
         raise NotADirectoryError(f"Provided path is not a directory: {folder_path}")
 
     csv_files = [f for f in os.listdir(folder_path) if f.endswith(".csv")]
-
     if len(csv_files) == 0:
         raise FileNotFoundError("No CSV files found in the provided directory.")
 
     data = {}
-    for file in csv_files:
-        full_path = os.path.join(folder_path, file)
-        df = pd.read_csv(full_path)
-        data[file] = df
+    file_paths = [os.path.join(folder_path, f) for f in csv_files]
+
+    n_proc = os.cpu_count() or 1  # fallback to 1 if detection fails
+    max_workers = max(1, n_proc - 1)  # leave one core free
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_file = {executor.submit(load_csv_file, fp): fp for fp in file_paths}
+        for future in as_completed(future_to_file):
+            filename, df = future.result()
+            data[filename] = df
 
     return data
 
 
 def select_columns(df: pd.DataFrame, exclude=None):
-    # Select numeric columns by default
+    """Select numeric columns with optional exclusions."""
     columns = df.select_dtypes(include='number').columns.tolist()
-
-    if exclude is None:
-        exclude = []
-
-    # Apply exclusion
+    exclude = exclude or []
     columns = [col for col in columns if col not in exclude]
 
-    n_cols_data = len(columns)
-    if n_cols_data == 0:
+    if not columns:
         print("No numeric columns found to plot.")
-        return
-    
-    return columns, n_cols_data
+        return [], 0
+
+    return columns, len(columns)
+
 
 def create_output_dirs(paths):
-    """
-    Create multiple directories if they do not exist.
-
-    Parameters:
-        paths (list of str): List of directory paths to create.
-    """
+    """Create multiple directories if they do not exist."""
     for path in paths:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        print(f"Ensured directory exists: {path}")
+        os.makedirs(path, exist_ok=True)
 
-def histogram_grid(df: pd.DataFrame, 
-                   exclude=None,
-                   filename="data_analysis/figures/histograms.png", 
-                   title="Histograms"):
-    """
-    Create a grid of histograms for the given DataFrame.
 
-    Parameters:
-        df (pd.DataFrame): The dataframe containing data.
-        exclude (list or None): Columns to exclude from plotting.
-        filename (str): Path to save the figure.
-        title (str): Figure title.
-    """
-    columns, n_cols_data = select_columns(df, exclude)
+def calculate_grid(n_plots):
+    """Calculate a square (or near-square) grid layout for n_plots."""
+    n_rows = math.ceil(math.sqrt(n_plots))
+    n_cols = math.ceil(n_plots / n_rows)
+    return n_rows, n_cols
 
-    # Prefer square layout
-    n_rows = math.ceil(math.sqrt(n_cols_data))
-    n_cols_grid = math.ceil(n_cols_data / n_rows)
 
-    fig, axes = plt.subplots(n_rows, n_cols_grid, figsize=(4*n_cols_grid, 4*n_rows))
+def save_figure(fig, filename, title=None):
+    """Save a matplotlib figure to file with suptitle."""
+    if title:
+        plt.suptitle(title, fontsize=16)
+    fig.savefig(filename)
+    plt.close(fig)
+
+
+def calculate_figsize(n_rows, n_cols):
+    return (4*n_cols, 4*n_rows)
+
+
+def turn_off_unused_axes(fig, axes, last_used_index):
+    for j in range(last_used_index+1, len(axes)):
+        fig.delaxes(axes[j])
+
+
+def plot_grid_base(df, columns, plot_func, title, filename):
+    """Generic grid plotting function for histograms, QQ-plots, scatter."""
+    n_cols_data = len(columns)
+    if n_cols_data == 0:
+        return
+
+    n_rows, n_cols_grid = calculate_grid(n_cols_data)
+    fig, axes = plt.subplots(n_rows, n_cols_grid, figsize=calculate_figsize(n_cols_grid, n_rows))
     axes = axes.flatten()
 
     for i, col in enumerate(columns):
-        data = df[col].dropna()
+        data = df[col]
         if len(data) == 0:
             print(f"Skipping column {col}: no valid data")
             continue
+        plot_func(axes[i], df, col)
 
-        # Plot histogram as counts (default)
-        axes[i].hist(data, bins=15, alpha=0.6, color='skyblue', edgecolor='black')
+    turn_off_unused_axes(fig, axes, i)
 
+    save_figure(fig, filename, title)
+
+
+def histogram_grid(df, exclude=None, filename="", title="Histograms"):
+    columns, _ = select_columns(df, exclude)
+    n_rows, n_cols_grid = calculate_grid(len(columns))
+    
+    fig, axes = plt.subplots(n_rows, n_cols_grid, figsize=calculate_figsize(n_cols_grid, n_rows))
+    axes = axes.flatten()
+    
+    for i, col in enumerate(columns):
+        sns.histplot(df[col], bins=15, kde=False, color='skyblue', ax=axes[i])
         axes[i].set_title(col)
         axes[i].set_xlabel(col)
         axes[i].set_ylabel("Count")
         axes[i].grid(True, alpha=0.3)
-
-    # Turn off unused axes
+        
     for j in range(i+1, len(axes)):
         fig.delaxes(axes[j])
-
-    plt.suptitle(title, fontsize=16)
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
-    plt.savefig(filename)
-    plt.close()
-    print(f"Saved histogram grid to {filename}")
+    
+    save_figure(fig, filename, title)
 
 
-def qqplot_grid(df: pd.DataFrame, 
-                exclude=None,
-                filename="data_analysis/figures/qqplots.png", 
-                title="QQ-Plots"):
+def qqplot_grid(df, exclude=None, filename="", title="QQ-Plots"):
     """
-    Create a grid of QQ-plots for the given DataFrame.
-
-    Parameters:
-        df (pd.DataFrame): The dataframe containing data.
-        exclude (list or None): Columns to exclude from plotting.
-        filename (str): Path to save the figure.
-        title (str): Figure title.
+    Create a grid of QQ-plots for the given DataFrame with Seaborn styling.
     """
-    columns, n_cols_data = select_columns(df, exclude)
-
-    # Prefer square layout
-    n_rows = math.ceil(math.sqrt(n_cols_data))
-    n_cols_grid = math.ceil(n_cols_data / n_rows)
-
-    # If the square layout is too tall, use 4x3 aspect ratio instead
-    if n_rows > n_cols_grid:
-        n_cols_grid = min(4, n_cols_data)
-        n_rows = math.ceil(n_cols_data / n_cols_grid)
-
-    fig, axes = plt.subplots(n_rows, n_cols_grid, figsize=(4*n_cols_grid, 4*n_rows))
-    axes = axes.flatten()  # Flatten in case of single row/column
+    columns, _ = select_columns(df, exclude)
+    n_rows, n_cols_grid = calculate_grid(len(columns))
+    
+    fig, axes = plt.subplots(n_rows, n_cols_grid, figsize=calculate_figsize(n_cols_grid, n_rows))
+    axes = axes.flatten()
 
     for i, col in enumerate(columns):
-        data = df[col].dropna()
-        if len(data) == 0:
-            print(f"Skipping column {col}: no valid data")
-            continue
-
-        stats.probplot(data, dist="norm", plot=axes[i])
-        axes[i].set_title(col)
+        stats.probplot(df[col], dist="norm", plot=axes[i])
+        axes[i].set_title(col, fontsize=12)
         axes[i].grid(True, alpha=0.3)
+        
+        # Optional: adjust tick parameters for readability
+        axes[i].tick_params(axis='both', which='major', labelsize=10)
 
-    # Turn off any unused subplots
-    for j in range(i+1, len(axes)):
-        fig.delaxes(axes[j])
+    turn_off_unused_axes(fig, axes, i)
 
-    plt.suptitle(title, fontsize=16)
-    plt.tight_layout(rect=[0, 0, 1, 0.96])  # Leave room for suptitle
-    plt.savefig(filename)
-    plt.close()
-    print(f"Saved QQ-plot grid to {filename}")
+    save_figure(fig, filename, title)
 
 
-def scatter_grid(df: pd.DataFrame,
-                 exclude=None,
-                 output_dir="data_analysis/figures/scatter",
-                 title_prefix="Scatter Plots"):
-    """
-    Create scatter plot grids for each numeric column against all numeric columns, 
-    including itself.
+def scatter_grid(df, exclude=None, output_dir="", title_prefix="Scatter Plots"):
+    columns, _ = select_columns(df, exclude)
 
-    Parameters:
-        df (pd.DataFrame): DataFrame with numeric data.
-        exclude (list or None): Columns to exclude from plotting.
-        output_dir (str): Directory to save figures.
-        title_prefix (str): Prefix for figure titles.
-    """
-    columns, n_cols_data = select_columns(df, exclude)
-    
-    # Loop over each column as X-axis
     for x_col in columns:
-        y_cols = columns  # include self
-        n_plots = len(y_cols)
-
-        # Grid layout: square preferred
-        n_rows = math.ceil(math.sqrt(n_plots))
-        n_cols_grid = math.ceil(n_plots / n_rows)
-
-        fig, axes = plt.subplots(n_rows, n_cols_grid, figsize=(4*n_cols_grid, 4*n_rows))
+        y_cols = columns
+        n_rows, n_cols_grid = calculate_grid(len(y_cols))
+        fig, axes = plt.subplots(n_rows, n_cols_grid, figsize=calculate_figsize(n_cols_grid, n_rows))
         axes = axes.flatten()
 
         for i, y_col in enumerate(y_cols):
-            x_data = df[x_col].dropna()
-            y_data = df[y_col].dropna()
-
-            # Align indices
-            mask = x_data.index.intersection(y_data.index)
-            axes[i].scatter(x_data.loc[mask], y_data.loc[mask], alpha=0.6)
+            sns.scatterplot(x=df[x_col], y=df[y_col], alpha=0.6, ax=axes[i])
             axes[i].set_xlabel(x_col)
             axes[i].set_ylabel(y_col)
             axes[i].set_title(f"{y_col} vs {x_col}")
             axes[i].grid(True, alpha=0.3)
 
-        # Turn off unused axes
-        for j in range(i+1, len(axes)):
-            fig.delaxes(axes[j])
-
-        plt.suptitle(f"{title_prefix}: {x_col} vs All", fontsize=16)
-        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        turn_off_unused_axes(fig, axes, i)
 
         out_file = os.path.join(output_dir, f"{x_col}_scatter.png")
-        plt.savefig(out_file)
-        plt.close()
-        print(f"Saved scatter plot grid for {x_col} to {out_file}")
+        save_figure(fig, out_file, f"{title_prefix}: {x_col} vs All")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Load evaluation CSV data and create QQ-plots.")
-    parser.add_argument(
-        "--data",
-        type=str,
-        required=True,
-        help="Path to the folder containing CSV files."
-    )
-    parser.add_argument(
-        "--exclude",
-        type=str,
-        default="",
-        help="Comma-separated list of column names to exclude from QQ-plots."
-    )
+    parser = argparse.ArgumentParser(description="Load evaluation CSV data and create plots.")
+    parser.add_argument("--data", type=str, required=True, help="Path to the folder containing CSV files.")
+    parser.add_argument("--exclude", type=str, default="", help="Comma-separated list of column names to exclude.")
 
     args = parser.parse_args()
-
     exclude = [c.strip() for c in args.exclude.split(",")] if args.exclude else []
 
     print(f"Loading data from: {args.data}")
     data = load_csv_folder(args.data)
-
     print(f"Loaded {len(data)} CSV files:")
-    
+
     base_out_path = "data_analysis/figures/"
     hist_out_path = f"{base_out_path}histograms/"
     qq_out_path = f"{base_out_path}qq_plots/"
     scatter_out_path = f"{base_out_path}scatter_plots/"
-    path_list = [hist_out_path, qq_out_path, scatter_out_path]
-    create_output_dirs(path_list)
+    create_output_dirs([hist_out_path, qq_out_path, scatter_out_path])
+
+    sns.set(style="whitegrid", palette="pastel", context="notebook")
 
     for filename, df in data.items():
         print(f" - {filename}: {df.shape[0]} rows, {df.shape[1]} columns")
-        base_out_filename = filename.replace('.csv','')
+        base_name = filename.replace(".csv", "")
 
-        # Histogram
-        hist_out_filename = f"{hist_out_path}/{base_out_filename}_histgrid.png"
-        histogram_grid(df, exclude=exclude, filename=hist_out_filename,
-                    title=f"Histograms: {filename}")
+        histogram_grid(df, exclude=exclude,
+                       filename=f"{hist_out_path}{base_name}_histgrid.png",
+                       title=f"Histograms: {filename}")
 
-        # QQ-plot
-        qq_out_filename = f"{qq_out_path}/{base_out_filename}_qqgrid.png"
-        qqplot_grid(df, exclude=exclude, filename=qq_out_filename, 
+        qqplot_grid(df, exclude=exclude,
+                    filename=f"{qq_out_path}{base_name}_qqgrid.png",
                     title=f"QQ-Plots: {filename}")
 
-        # Scatter plots: one figure per dependent variable
-        scatter_file_dir = f"{scatter_out_path}/{base_out_filename}/"
-        create_output_dirs([scatter_file_dir])
+        scatter_dir = f"{scatter_out_path}{base_name}/"
+        create_output_dirs([scatter_dir])
+        scatter_grid(df, exclude=exclude, output_dir=scatter_dir,
+                     title_prefix=f"Scatter Plots: {filename}")
 
-        scatter_grid(df, exclude=exclude, output_dir=scatter_file_dir,
-                    title_prefix=f"Scatter Plots: {filename}")
 
 if __name__ == "__main__":
     main()

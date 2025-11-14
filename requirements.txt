@@ -6,6 +6,7 @@ pandas
 rsl-rl-lib==2.2.4
 sb3_contrib
 scipy
+seaborn
 stable-baselines3
 tensorboard
 torch
