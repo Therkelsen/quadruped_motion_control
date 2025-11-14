@@ -34,6 +34,15 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
     """Evaluate a model for a given number of episodes."""
     results = []
 
+    # Helper to get the actual environment inside VecEnv
+    def get_unwrapped_env(env):
+        if hasattr(env, "envs"):  # VecEnv
+            return env.envs[0]
+        else:
+            return env
+
+    unwrapped_env = get_unwrapped_env(env)
+
     for ep in range(episodes):
         obs = env.reset() if vec_env else env.reset()[0]
 
@@ -41,16 +50,19 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
         ep_reward = 0.0
         ep_length = 0
         test_reward = 0.0
+
         while not done:
+            # TD3/SAC deterministic evaluation
             action, _ = model.predict(obs, deterministic=True)
             step_out = env.step(action)
-            
-            track_vel_rew = env.env._reward_tracking_lin_vel()
-            track_ang_rew = env.env._reward_tracking_ang_vel()
-            lin_z_rew = env.env._reward_lin_vel_z()
-            action_rate_rew = env.env._reward_action_rate()
-            similar_default_rew = env.env._reward_similar_to_default()
-            base_height_rew = env.env._reward_base_height()
+
+            # Reward components from the actual environment
+            track_vel_rew = unwrapped_env._reward_tracking_lin_vel()
+            track_ang_rew = unwrapped_env._reward_tracking_ang_vel()
+            lin_z_rew = unwrapped_env._reward_lin_vel_z()
+            action_rate_rew = unwrapped_env._reward_action_rate()
+            similar_default_rew = unwrapped_env._reward_similar_to_default()
+            base_height_rew = unwrapped_env._reward_base_height()
 
             test_reward += (
                 track_vel_rew
@@ -60,14 +72,16 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
                 + similar_default_rew
                 + base_height_rew
             )
-            
+
+            # Print reward breakdown
             print(f"Tracking Linear Vel Reward: {track_vel_rew:.3f}")
             print(f"Tracking Angular Vel Reward: {track_ang_rew:.3f}")
             print(f"Linear Z Velocity Reward: {lin_z_rew:.3f}")
             print(f"Action Rate Reward: {action_rate_rew:.3f}")
             print(f"Similar to Default Pose Reward: {similar_default_rew:.3f}")
             print(f"Base Height Reward: {base_height_rew:.3f}")
-            
+
+            # Unpack step outputs depending on environment type
             if vec_env:
                 obs, reward, dones, infos = step_out
                 reward = reward[0]
@@ -78,13 +92,15 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
 
             ep_reward += reward
             ep_length += 1
-            
+
+        # Episode summary
         print(f"Episode {ep+1}/{episodes} — Reward: {ep_reward:.3f}, Length: {ep_length}")
         print(f"Test_reward {test_reward:.3f}")
-        
+
         results.append((ep_reward, ep_length))
 
     return results
+
 
 
 def main():
