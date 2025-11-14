@@ -122,7 +122,6 @@ class Go2Env:
 
     def step(self, actions):
         # --- Logging setup ---
-        log_interval = 1000  # print every 1000 steps
         if not hasattr(self, "_log_counter"):
             self._log_counter = 0
         self._log_counter += 1
@@ -193,19 +192,6 @@ class Go2Env:
         self.last_dof_vel[:] = self.dof_vel[:]
 
         self.extras["observations"]["critic"] = self.obs_buf
-
-        # --- Log action stats occasionally ---
-        if self._log_counter % log_interval == 0:
-            try:
-                # compute across all environments
-                action_mean = self.actions.mean().item()
-                action_std = self.actions.std().item()
-                print(
-                    f"[Go2Env] Step {int(self.episode_length_buf.float().mean().item())} | "
-                    f"Action mean: {action_mean:.4f}, std: {action_std:.4f}"
-                )
-            except Exception as e:
-                print(f"[Go2Env] Logging error: {e}")
 
         return self.obs_buf, self.rew_buf, self.reset_buf, self.extras
 
