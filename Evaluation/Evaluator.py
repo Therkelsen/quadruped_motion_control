@@ -41,7 +41,7 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
         ep_length = 0
 
         while not done:
-            action, _ = model.predict(obs, deterministic=False)
+            action, _ = model.predict(obs, deterministic=True)
             step_out = env.step(action)
 
             if vec_env:
@@ -70,9 +70,9 @@ def main():
     gs.init()
 
     algorithms = [
+        ("td3", TD3),
         ("ppo", PPO),
         ("sac", SAC),
-        ("td3", TD3),
     ]
 
     all_results = []
@@ -97,7 +97,7 @@ def main():
         print(env_cfg["episode_length_s"])
         
         # TD3 requires VecNormalize + DummyVecEnv
-        if algo_name == "TD3":
+        if algo_name == "td3":
             def make_env():
                 return Go2GymSingle(
                     env_cfg=env_cfg,
