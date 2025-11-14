@@ -7,6 +7,7 @@ import genesis as gs
 
 from stable_baselines3 import PPO, SAC, TD3
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+import test
 
 from src.Gymwrapper import Go2GymSingle
 
@@ -39,11 +40,34 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
         done = False
         ep_reward = 0.0
         ep_length = 0
-
+        test_reward = 0.0
         while not done:
             action, _ = model.predict(obs, deterministic=True)
             step_out = env.step(action)
+            
+            track_vel_rew = env.env._reward_tracking_lin_vel()
+            track_ang_rew = env.env._reward_tracking_ang_vel()
+            lin_z_rew = env.env._reward_lin_vel_z()
+            action_rate_rew = env.env._reward_action_rate()
+            similar_default_rew = env.env._reward_similar_to_default()
+            base_height_rew = env.env._reward_base_height()
 
+            test_reward += (
+                track_vel_rew
+                + track_ang_rew
+                + lin_z_rew
+                + action_rate_rew
+                + similar_default_rew
+                + base_height_rew
+            )
+            
+            print(f"Tracking Linear Vel Reward: {track_vel_rew:.3f}")
+            print(f"Tracking Angular Vel Reward: {track_ang_rew:.3f}")
+            print(f"Linear Z Velocity Reward: {lin_z_rew:.3f}")
+            print(f"Action Rate Reward: {action_rate_rew:.3f}")
+            print(f"Similar to Default Pose Reward: {similar_default_rew:.3f}")
+            print(f"Base Height Reward: {base_height_rew:.3f}")
+            
             if vec_env:
                 obs, reward, dones, infos = step_out
                 reward = reward[0]
@@ -54,7 +78,10 @@ def evaluate_model(model, env, episodes=10, vec_env=False):
 
             ep_reward += reward
             ep_length += 1
+            
         print(f"Episode {ep+1}/{episodes} — Reward: {ep_reward:.3f}, Length: {ep_length}")
+        print(f"Test_reward {test_reward:.3f}")
+        
         results.append((ep_reward, ep_length))
 
     return results
