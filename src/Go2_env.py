@@ -207,9 +207,21 @@ class Go2Env:
         if len(envs_idx) == 0:
             return
 
-        # reset dofs
-        self.dof_pos[envs_idx] = self.default_dof_pos
-        self.dof_vel[envs_idx] = 0.0
+        # -----------------------------
+        # Randomization magnitudes
+        # -----------------------------
+        joint_perturb = 0.05        # radians
+        base_pos_perturb = 0.02     # meters
+        base_rot_perturb = 0.05     # quaternion noise
+        # -----------------------------
+
+        # -------- Reset DOFs with slight perturbation --------
+        self.dof_pos[envs_idx] = (
+            self.default_dof_pos
+            + joint_perturb * torch.randn_like(self.dof_pos[envs_idx])
+        )
+        self.dof_vel[envs_idx] = 0.0  # ABSOLUTELY NO INITIAL SPEED
+
         self.robot.set_dofs_position(
             position=self.dof_pos[envs_idx],
             dofs_idx_local=self.motors_dof_idx,
@@ -217,30 +229,48 @@ class Go2Env:
             envs_idx=envs_idx,
         )
 
-        # reset base
-        self.base_pos[envs_idx] = self.base_init_pos
-        self.base_quat[envs_idx] = self.base_init_quat.reshape(1, -1)
+        # -------- Reset Base with slight perturbation --------
+        # Position perturbation
+        self.base_pos[envs_idx] = (
+            self.base_init_pos
+            + base_pos_perturb * torch.randn((len(envs_idx), 3), device=self.base_pos.device)
+        )
+
+        # Orientation perturbation
+        quat_noise = base_rot_perturb * torch.randn(
+            (len(envs_idx), 4), device=self.base_quat.device
+        )
+        perturbed_quat = self.base_init_quat.reshape(1, -1) + quat_noise
+        perturbed_quat /= torch.norm(perturbed_quat, dim=1, keepdim=True)  # normalize
+
+        self.base_quat[envs_idx] = perturbed_quat
+
         self.robot.set_pos(self.base_pos[envs_idx], zero_velocity=False, envs_idx=envs_idx)
         self.robot.set_quat(self.base_quat[envs_idx], zero_velocity=False, envs_idx=envs_idx)
-        self.base_lin_vel[envs_idx] = 0
-        self.base_ang_vel[envs_idx] = 0
+
+        # -------- Zero ALL velocities (no initial motion!) --------
+        self.base_lin_vel[envs_idx] = 0.0
+        self.base_ang_vel[envs_idx] = 0.0
         self.robot.zero_all_dofs_velocity(envs_idx)
 
-        # reset buffers
+        # -------- Reset buffers --------
         self.last_actions[envs_idx] = 0.0
         self.last_dof_vel[envs_idx] = 0.0
         self.episode_length_buf[envs_idx] = 0
         self.reset_buf[envs_idx] = True
 
-        # fill extras
-        self.extras["episode"] = {}
-        for key in self.episode_sums.keys():
-            self.extras["episode"]["rew_" + key] = (
-                torch.mean(self.episode_sums[key][envs_idx]).item() / self.env_cfg["episode_length_s"]
-            )
-            self.episode_sums[key][envs_idx] = 0.0
+    # -------- Log episodic rewards --------
+    self.extras["episode"] = {}
+    for key in self.episode_sums.keys():
+        self.extras["episode"]["rew_" + key] = (
+            torch.mean(self.episode_sums[key][envs_idx]).item()
+            / self.env_cfg["episode_length_s"]
+        )
+        self.episode_sums[key][envs_idx] = 0.0
 
-        self._resample_commands(envs_idx)
+    # -------- Resample commands --------
+    self._resample_commands(envs_idx)
+
 
     def reset(self):
         self.reset_buf[:] = True
