@@ -259,17 +259,17 @@ class Go2Env:
         self.episode_length_buf[envs_idx] = 0
         self.reset_buf[envs_idx] = True
 
-    # -------- Log episodic rewards --------
-    self.extras["episode"] = {}
-    for key in self.episode_sums.keys():
-        self.extras["episode"]["rew_" + key] = (
-            torch.mean(self.episode_sums[key][envs_idx]).item()
-            / self.env_cfg["episode_length_s"]
-        )
-        self.episode_sums[key][envs_idx] = 0.0
+        # -------- Log episodic rewards --------
+        self.extras["episode"] = {}
+        for key in self.episode_sums.keys():
+            self.extras["episode"]["rew_" + key] = (
+                torch.mean(self.episode_sums[key][envs_idx]).item()
+                / self.env_cfg["episode_length_s"]
+            )
+            self.episode_sums[key][envs_idx] = 0.0
 
-    # -------- Resample commands --------
-    self._resample_commands(envs_idx)
+        # -------- Resample commands --------
+        self._resample_commands(envs_idx)
 
 
     def reset(self):
