@@ -93,6 +93,7 @@ def plot_grid_base(df, columns, plot_func, title, filename):
 
     n_rows, n_cols_grid = calculate_grid(n_cols_data)
     fig, axes = plt.subplots(n_rows, n_cols_grid, figsize=calculate_figsize(n_cols_grid, n_rows))
+    fig.subplots_adjust(wspace=1, hspace=1)
     axes = axes.flatten()
 
     for i, col in enumerate(columns):
@@ -112,6 +113,7 @@ def histogram_grid(df, exclude=None, filename="", title="Histograms"):
     n_rows, n_cols_grid = calculate_grid(len(columns))
     
     fig, axes = plt.subplots(n_rows, n_cols_grid, figsize=calculate_figsize(n_cols_grid, n_rows))
+    fig.subplots_adjust(wspace=1, hspace=1)
     axes = axes.flatten()
     
     for i, col in enumerate(columns):
@@ -127,6 +129,87 @@ def histogram_grid(df, exclude=None, filename="", title="Histograms"):
     save_figure(fig, filename, title)
 
 
+def boxplot_grid(df, exclude=None, filename="", title="Boxplots"):
+    columns, _ = select_columns(df, exclude)
+    n_rows, n_cols_grid = calculate_grid(len(columns))
+
+    fig, axes = plt.subplots(n_rows, n_cols_grid,
+                             figsize=calculate_figsize(n_cols_grid, n_rows))
+    fig.subplots_adjust(wspace=1, hspace=1)
+    axes = axes.flatten()
+
+    for i, col in enumerate(columns):
+        sns.boxplot(x=df[col], ax=axes[i])
+        axes[i].set_title(col)
+        axes[i].set_xlabel(col)
+        axes[i].set_ylabel("Value")
+        axes[i].grid(True, alpha=0.3)
+
+    # turn off unused axes
+    for j in range(i+1, len(axes)):
+        fig.delaxes(axes[j])
+
+    save_figure(fig, filename, title)
+
+
+def boxplot_across_files(data_dict, exclude=None, output_dir=""):
+    """
+    Creates one big figure with subplots, where each subplot is a boxplot
+    of one numeric variable across CSV files.
+    """
+    # Collect all numeric columns across files
+    all_columns = set()
+    for df in data_dict.values():
+        all_columns.update(df.select_dtypes(include='number').columns.tolist())
+
+    if exclude:
+        all_columns = [c for c in all_columns if c not in exclude]
+    else:
+        all_columns = list(all_columns)
+
+    if not all_columns:
+        return
+
+    # Ensure output directory exists
+    create_output_dirs([output_dir])
+
+    n_vars = len(all_columns)
+    n_rows, n_cols_grid = calculate_grid(n_vars)
+    if n_cols_grid > 4:  # Cap width at 4 columns
+        n_cols_grid = 4
+        n_rows = math.ceil(n_vars / n_cols_grid)
+
+    fig, axes = plt.subplots(n_rows, n_cols_grid, figsize=calculate_figsize(n_cols_grid, n_rows))
+    axes = axes.flatten()
+
+    for i, col in enumerate(all_columns):
+        plot_data = []
+        labels = []
+
+        for filename, df in data_dict.items():
+            if col in df.columns:
+                plot_data.append(df[col].dropna().values)
+                labels.append(filename.replace(".csv", ""))
+
+        if not plot_data:
+            continue
+
+        sns.boxplot(data=plot_data, ax=axes[i])
+        axes[i].set_xticks(range(len(labels)))
+        axes[i].set_xticklabels(labels, rotation=30)  # less rotation
+        axes[i].set_ylabel(col)
+        axes[i].set_title(col)
+        axes[i].grid(True, alpha=0.3)
+
+    turn_off_unused_axes(fig, axes, i)
+
+    # Increase space at the bottom for x-axis labels
+    fig.subplots_adjust(wspace=0.4, hspace=1)
+
+    out_file = os.path.join(output_dir, "boxplots_all_vars.png")
+    save_figure(fig, out_file, "Boxplots of all variables across CSV files")
+
+
 def qqplot_grid(df, exclude=None, filename="", title="QQ-Plots"):
     """
     Create a grid of QQ-plots for the given DataFrame with Seaborn styling.
@@ -135,6 +218,7 @@ def qqplot_grid(df, exclude=None, filename="", title="QQ-Plots"):
     n_rows, n_cols_grid = calculate_grid(len(columns))
     
     fig, axes = plt.subplots(n_rows, n_cols_grid, figsize=calculate_figsize(n_cols_grid, n_rows))
+    fig.subplots_adjust(wspace=1, hspace=1)
     axes = axes.flatten()
 
     for i, col in enumerate(columns):
@@ -157,6 +241,7 @@ def scatter_grid(df, exclude=None, output_dir="", title_prefix="Scatter Plots"):
         y_cols = columns
         n_rows, n_cols_grid = calculate_grid(len(y_cols))
         fig, axes = plt.subplots(n_rows, n_cols_grid, figsize=calculate_figsize(n_cols_grid, n_rows))
+        fig.subplots_adjust(wspace=1, hspace=1)
         axes = axes.flatten()
 
         for i, y_col in enumerate(y_cols):
@@ -186,9 +271,12 @@ def main():
 
     base_out_path = "data_analysis/figures/"
     hist_out_path = f"{base_out_path}histograms/"
-    qq_out_path = f"{base_out_path}qq_plots/"
+    qq_out_path   = f"{base_out_path}qq_plots/"
+    box_out_path  = f"{base_out_path}boxplots/"
     scatter_out_path = f"{base_out_path}scatter_plots/"
-    create_output_dirs([hist_out_path, qq_out_path, scatter_out_path])
+
+    # Create directories
+    create_output_dirs([hist_out_path, qq_out_path, box_out_path, scatter_out_path])
 
     sns.set(style="whitegrid", palette="pastel", context="notebook")
 
@@ -196,18 +284,42 @@ def main():
         print(f" - {filename}: {df.shape[0]} rows, {df.shape[1]} columns")
         base_name = filename.replace(".csv", "")
 
-        histogram_grid(df, exclude=exclude,
-                       filename=f"{hist_out_path}{base_name}_histgrid.png",
-                       title=f"Histograms: {filename}")
+        # # Histograms
+        # histogram_grid(
+        #     df, exclude=exclude,
+        #     filename=f"{hist_out_path}{base_name}_histgrid.png",
+        #     title=f"Histograms: {filename}"
+        # )
 
-        qqplot_grid(df, exclude=exclude,
-                    filename=f"{qq_out_path}{base_name}_qqgrid.png",
-                    title=f"QQ-Plots: {filename}")
+        # # QQ plots
+        # qqplot_grid(
+        #     df, exclude=exclude,
+        #     filename=f"{qq_out_path}{base_name}_qqgrid.png",
+        #     title=f"QQ-Plots: {filename}"
+        # )
 
-        scatter_dir = f"{scatter_out_path}{base_name}/"
-        create_output_dirs([scatter_dir])
-        scatter_grid(df, exclude=exclude, output_dir=scatter_dir,
-                     title_prefix=f"Scatter Plots: {filename}")
+        # # Boxplots
+        # boxplot_grid(
+        #     df, exclude=exclude,
+        #     filename=f"{box_out_path}{base_name}_boxgrid.png",
+        #     title=f"Boxplots: {filename}"
+        # )
+
+        boxplot_across_files(
+            data,
+            exclude=exclude,
+            output_dir=box_out_path
+        )
+
+        # # Scatter plots (folder per CSV)
+        # scatter_dir = f"{scatter_out_path}{base_name}/"
+        # create_output_dirs([scatter_dir])
+
+        # scatter_grid(
+        #     df, exclude=exclude,
+        #     output_dir=scatter_dir,
+        #     title_prefix=f"Scatter Plots: {filename}"
+        # )
 
 
 if __name__ == "__main__":
