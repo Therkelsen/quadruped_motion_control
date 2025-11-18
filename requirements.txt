@@ -8,5 +8,6 @@ sb3_contrib
 scipy
 seaborn
 stable-baselines3
+statsmodels
 tensorboard
 torch

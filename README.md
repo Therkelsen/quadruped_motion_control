@@ -54,6 +54,11 @@ For running inference:
 python3 -m Evaluation.PPO_eval --exp_name experiment_name --episodes num_episodes
 ```
 
+Data analysis:
+```bash
+python3 data_analysis/data_analysis.py --data data_analysis/data --exclude episode,length,action_rate
+```
+
 ## Resources:
 
 [Genesis Github](https://github.com/Genesis-Embodied-AI/Genesis?tab=readme-ov-file)

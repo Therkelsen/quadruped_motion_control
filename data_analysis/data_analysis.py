@@ -7,8 +7,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 import seaborn as sns
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from statsmodels.multivariate.manova import MANOVA
 
 
 def load_csv_file(file_path):
@@ -257,6 +260,135 @@ def scatter_grid(df, exclude=None, output_dir="", title_prefix="Scatter Plots"):
         save_figure(fig, out_file, f"{title_prefix}: {x_col} vs All")
 
 
+def run_manova(data_dict, exclude=None):
+    """
+    Correct MANOVA: combine all CSVs into one dataset,
+    each CSV is a 'group' (RL algorithm), DVs = numeric columns.
+    """
+    # 1. Collect all numeric columns across files
+    all_columns = set()
+    for df in data_dict.values():
+        all_columns.update(df.select_dtypes(include='number').columns.tolist())
+
+    if exclude:
+        all_columns = [c for c in all_columns if c not in exclude]
+    else:
+        all_columns = list(all_columns)
+
+    if not all_columns:
+        print("No numeric columns found for MANOVA.")
+        return
+
+    # 2. Combine CSVs into one DataFrame with a 'group' column
+    combined_data = []
+    for filename, df in data_dict.items():
+        subset = df[all_columns].copy()
+        subset['group'] = filename.replace(".csv", "")
+        combined_data.append(subset)
+
+    combined_df = pd.concat(combined_data, ignore_index=True)
+
+    # 3. Build formula: DV1 + DV2 + ... + DVn ~ group
+    formula = " + ".join(all_columns) + " ~ group"
+    
+    # 4. Run MANOVA
+    manova = MANOVA.from_formula(formula, data=combined_df)
+    print("\n=== MANOVA Results ===")
+    print(manova.mv_test())
+
+
+def run_anovas(data_dict, exclude=None):
+    """
+    Run one-way ANOVA for each numeric dependent variable across groups (CSV files).
+    Prints results similar to MANOVA.
+
+    Uses: statsmodels.api as sm, statsmodels.formula.api as smf
+    """
+
+    # 1. Collect all numeric column names across files
+    all_columns = set()
+    for df in data_dict.values():
+        all_columns.update(df.select_dtypes(include='number').columns.tolist())
+
+    if exclude:
+        all_columns = [c for c in all_columns if c not in exclude]
+    else:
+        all_columns = list(all_columns)
+
+    if not all_columns:
+        print("No numeric columns available for ANOVA.")
+        return
+
+    # 2. Combine data into one dataframe with a 'group' column
+    combined_rows = []
+    for filename, df in data_dict.items():
+        name = filename.replace(".csv", "")
+        tmp = df[all_columns].copy()
+        tmp["group"] = name
+        combined_rows.append(tmp)
+
+    combined_df = pd.concat(combined_rows, ignore_index=True)
+
+    print("\n=== ANOVA Results (one-way) ===")
+
+    # 3. Run ANOVA for each DV
+    for dv in all_columns:
+        formula = f"{dv} ~ C(group)"  # C() ensures categorical
+        model = smf.ols(formula, data=combined_df).fit()
+        anova_table = sm.stats.anova_lm(model, typ=2)
+
+        print(f"\n--- ANOVA for dependent variable: {dv} ---")
+        print(anova_table)
+        print("-------------------------------------------")
+    
+
+def run_tukey_hsd(data_dict, exclude=None):
+    """
+    Run Tukey HSD (post-hoc) test for each numeric dependent variable across groups (CSV files).
+    Prints results in terminal.
+    """
+    import statsmodels.api as sm
+    from statsmodels.stats.multicomp import pairwise_tukeyhsd
+
+    # 1. Collect all numeric column names across files
+    all_columns = set()
+    for df in data_dict.values():
+        all_columns.update(df.select_dtypes(include='number').columns.tolist())
+
+    if exclude:
+        all_columns = [c for c in all_columns if c not in exclude]
+    else:
+        all_columns = list(all_columns)
+
+    if not all_columns:
+        print("No numeric columns available for Tukey HSD.")
+        return
+
+    # 2. Combine data into one dataframe with a 'group' column
+    combined_rows = []
+    for filename, df in data_dict.items():
+        name = filename.replace(".csv", "")
+        tmp = df[all_columns].copy()
+        tmp["group"] = name
+        combined_rows.append(tmp)
+
+    combined_df = pd.concat(combined_rows, ignore_index=True)
+
+    print("\n=== Tukey HSD Post-hoc Test ===")
+
+    # 3. Run Tukey HSD for each dependent variable
+    for dv in all_columns:
+        try:
+            tukey = pairwise_tukeyhsd(endog=combined_df[dv],
+                                    groups=combined_df["group"],
+                                    alpha=0.05)
+            print(f"\n--- Tukey HSD for dependent variable: {dv} ---")
+            print(tukey)
+            print("-------------------------------------------")
+        except Exception as e:
+            print(f"Could not run Tukey HSD for {dv}: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Load evaluation CSV data and create plots.")
     parser.add_argument("--data", type=str, required=True, help="Path to the folder containing CSV files.")
@@ -284,42 +416,53 @@ def main():
         print(f" - {filename}: {df.shape[0]} rows, {df.shape[1]} columns")
         base_name = filename.replace(".csv", "")
 
-        # # Histograms
-        # histogram_grid(
-        #     df, exclude=exclude,
-        #     filename=f"{hist_out_path}{base_name}_histgrid.png",
-        #     title=f"Histograms: {filename}"
-        # )
-
-        # # QQ plots
-        # qqplot_grid(
-        #     df, exclude=exclude,
-        #     filename=f"{qq_out_path}{base_name}_qqgrid.png",
-        #     title=f"QQ-Plots: {filename}"
-        # )
-
-        # # Boxplots
-        # boxplot_grid(
-        #     df, exclude=exclude,
-        #     filename=f"{box_out_path}{base_name}_boxgrid.png",
-        #     title=f"Boxplots: {filename}"
-        # )
-
-        boxplot_across_files(
-            data,
-            exclude=exclude,
-            output_dir=box_out_path
+        # Histograms
+        histogram_grid(
+            df, exclude=exclude,
+            filename=f"{hist_out_path}{base_name}_histgrid.png",
+            title=f"Histograms: {filename}"
         )
 
-        # # Scatter plots (folder per CSV)
-        # scatter_dir = f"{scatter_out_path}{base_name}/"
-        # create_output_dirs([scatter_dir])
+        # QQ plots
+        qqplot_grid(
+            df, exclude=exclude,
+            filename=f"{qq_out_path}{base_name}_qqgrid.png",
+            title=f"QQ-Plots: {filename}"
+        )
 
-        # scatter_grid(
-        #     df, exclude=exclude,
-        #     output_dir=scatter_dir,
-        #     title_prefix=f"Scatter Plots: {filename}"
-        # )
+        # Boxplots
+        boxplot_grid(
+            df, exclude=exclude,
+            filename=f"{box_out_path}{base_name}_boxgrid.png",
+            title=f"Boxplots: {filename}"
+        )
+
+        # Scatter plots (folder per CSV)
+        scatter_dir = f"{scatter_out_path}{base_name}/"
+        create_output_dirs([scatter_dir])
+
+        scatter_grid(
+            df, exclude=exclude,
+            output_dir=scatter_dir,
+            title_prefix=f"Scatter Plots: {filename}"
+        )
+
+    # Boxplots across files
+    boxplot_across_files(
+        data,
+        exclude=exclude,
+        output_dir=box_out_path
+    )
+
+    # MANOVA across CSV files — only once
+    print("\nRunning MANOVA across CSV files:")
+    run_manova(data, exclude=exclude)
+
+    print("\nRunning ANOVAs across CSV files:")
+    run_anovas(data, exclude=exclude)
+
+    print("\nRunning Tukey HSD post-hoc tests across CSV files:")
+    run_tukey_hsd(data, exclude=exclude)
 
 
 if __name__ == "__main__":
