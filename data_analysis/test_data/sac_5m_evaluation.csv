@@ -1,6 +1,0 @@
-model,steps_trained,episode_id,total_reward,tracking_lin_vel,tracking_ang_vel,lin_vel_z,base_height,action_rate,similar_to_default,episode_length,distance_travelled
-SAC,5000000,1,528.7,240.5,118.1,7.4,36.2,-21.9,188.4,15.1,4.02
-SAC,5000000,2,501.3,229.8,112.7,6.9,35.7,-23.4,177.3,14.3,3.77
-SAC,5000000,3,543.8,247.2,121.4,7.9,36.5,-20.8,192.1,15.6,4.18
-SAC,5000000,4,512.9,234.1,115.6,6.8,35.4,-22.7,184.5,14.7,3.89
-SAC,5000000,5,537.0,245.0,120.2,7.6,36.1,-21.4,190.3,15.3,4.11
