@@ -51,19 +51,14 @@ For running inference:
 python3 -m Evaluation.PPO_eval --exp_name experiment_name --episodes num_episodes
 ```
 
-Data analysis:
-```bash
-python3 data_analysis/data_analysis.py --data data_analysis/data --exclude episode,length,action_rate
-```
-
-Data analysis:
-```bash
-python3 data_analysis/data_analysis.py --data data_analysis/data --exclude episode,length,action_rate
-```
-
 The same commands apply for using TD3 and SAC, just replace fx. PPO_train with TD3_train and PPO_eval with TD3_eval and so on.
 
 The Evaluator Tool under Evaluation can be used to evaluate several models in one go and print csv data for the episodes for later use by the scripts in the data_analysis folder.
+
+Data analysis:
+```bash
+python3 data_analysis/data_analysis.py --data data_analysis/data --exclude episode,length,action_rate
+```
 
 ## Resources:
 
