@@ -40,11 +40,6 @@ def main():
     env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
     train_cfg = get_train_cfg(args.exp_name, max_iterations=100)
 
-    env_cfg["action_scale"] = 0.35   # strong enough to move but not chaotic
-    env_cfg["kp"] = 60.0
-    env_cfg["kd"] = 1.0
-    env_cfg["simulate_action_latency"] = False
-    
     # Save configs for reproducibility
     with open(f"{log_dir}/cfgs.pkl", "wb") as f:
         pickle.dump([env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg], f)

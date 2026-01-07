@@ -44,7 +44,7 @@ def main():
 
         while not done:
             # deterministic actions
-            action, _ = model.predict(obs, deterministic=False)
+            action, _ = model.predict(obs, deterministic=True)
             obs, reward, terminated, truncated, info = env.step(action)
             total_reward += reward
             done = terminated or truncated
